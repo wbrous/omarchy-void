@@ -30,11 +30,20 @@ echo "  Output: $OUTPUT"
 echo "  Mirror: $MIRROR_URL"
 echo "  Packages: $(echo "$ISO_PACKAGES" | wc -w)"
 
-sudo "$MKLIVE_DIR/mklive.sh" \
-  -a x86_64 \
-  -r "$MIRROR_URL" \
-  -p "$ISO_PACKAGES" \
-  -I "$SCRIPT_DIR/overlay" \
-  -o "$OUTPUT"
-
+# Skip sudo if already running as root (e.g., in containers)
+if (( EUID == 0 )); then
+  "$MKLIVE_DIR/mklive.sh" \
+    -a x86_64 \
+    -r "$MIRROR_URL" \
+    -p "$ISO_PACKAGES" \
+    -I "$SCRIPT_DIR/overlay" \
+    -o "$OUTPUT"
+else
+  sudo "$MKLIVE_DIR/mklive.sh" \
+    -a x86_64 \
+    -r "$MIRROR_URL" \
+    -p "$ISO_PACKAGES" \
+    -I "$SCRIPT_DIR/overlay" \
+    -o "$OUTPUT"
+fi
 echo "ISO built: $OUTPUT"
