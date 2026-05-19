@@ -32,20 +32,19 @@ jobs:
           fetch-depth: 0
 
       - name: Build ISO inside Void container
+        env:
+          ISO_VERSION: ${{ github.event.inputs.version }}
         run: |
           set -euo pipefail
 
-          VERSION="${{ github.event.inputs.version }}"
-          REPO="${{ github.workspace }}"
-          OUTPUT="$REPO/omarchy-void-${VERSION}-x86_64.iso"
-
           docker run --privileged --rm \
-            -v "$REPO:/src:rw" \
+            -v "${{ github.workspace }}:/src:rw" \
+            -e ISO_VERSION="$ISO_VERSION" \
             -e MKLIVE_DIR=/void-mklive \
             -e OMARCHY_MIRROR="https://repo-fastly.voidlinux.org/current" \
             ghcr.io/void-linux/void-glibc:latest \
-            /bin/bash -c "
-              set -euo pipefail
+            /bin/sh -c '
+              set -e
 
               # Sync repos and install tools
               xbps-install -Syu -y
@@ -56,8 +55,9 @@ jobs:
 
               # Build
               cd /src
-              bash iso/build.sh '$OUTPUT'
-            "
+              OUTPUT="/src/omarchy-void-${ISO_VERSION}-x86_64.iso"
+              bash iso/build.sh "$OUTPUT"
+            '
 
       - name: Upload ISO artifact
         uses: actions/upload-artifact@v4
