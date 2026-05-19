@@ -43,7 +43,7 @@ jobs:
             -v "$REPO:/src:rw" \
             -e MKLIVE_DIR=/void-mklive \
             -e OMARCHY_MIRROR="https://repo-fastly.voidlinux.org/current" \
-            voidlinux/void-glibc:latest \
+            ghcr.io/void-linux/void-glibc:latest \
             /bin/bash -c "
               set -euo pipefail
 
