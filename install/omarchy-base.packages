@@ -19,6 +19,7 @@ cups-pdf
 docker
 docker-buildx
 docker-compose
+qemu-user-static
 dosfstools
 dust
 elogind
