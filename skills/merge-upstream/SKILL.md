@@ -1,6 +1,21 @@
+---
+name: merge-upstream
+description: >
+  Track and selectively port features from basecamp/omarchy (Arch Linux) into a
+  Void Linux fork. Use this skill whenever the user wants to merge upstream
+  changes, port a feature from the original Arch-based Omarchy, cherry-pick a
+  commit, see what changed upstream, or sync with basecamp/omarchy. Also use
+  when the user mentions upstream, backporting, feature ports, or keeping their
+  fork in sync with the original project.
+compatibility: >
+  Requires git, omarchy-upstream-* commands in PATH, and a git remote named
+  'upstream' pointing to basecamp/omarchy.
+---
+
 # Merge Upstream Features into Omarchy-Void
 
-Track and selectively port features from `basecamp/omarchy` (Arch) into `wbrous/omarchy-void` (Void).
+Track and selectively port features from `basecamp/omarchy` (Arch) into
+`wbrous/omarchy-void` (Void).
 
 ## When to Use
 
@@ -10,7 +25,9 @@ Track and selectively port features from `basecamp/omarchy` (Arch) into `wbrous/
 
 ## When Not to Use
 
-- Do not use `git merge upstream/main` — the forks diverged too far (450+ files, different package manager, init system, bootloader). Automatic merges are a trap.
+- Do not use `git merge upstream/master` — the forks diverged too far (450+
+  files, different package manager, init system, bootloader). Automatic merges
+  are a trap.
 - Do not use this for bulk-syncing. Port one feature at a time.
 
 ## One-Time Setup
@@ -23,81 +40,63 @@ git remote add upstream https://github.com/basecamp/omarchy.git 2>/dev/null || t
 
 ## Daily Workflow
 
+Use the `omarchy upstream *` commands installed by this fork:
+
 ### 1. Refresh upstream tracking
 
 ```bash
-git fetch upstream
+omarchy upstream sync
 ```
+
+This adds the upstream remote if missing and fetches all branches.
 
 ### 2. See what's new
 
 ```bash
-# Commits upstream has that you don't
-git log --oneline --graph --left-right HEAD...upstream/main | head -40
-
-# Or: just the upstream-only commits
-git log --oneline HEAD..upstream/main | head -40
+omarchy upstream log [N]   # default 30 commits
 ```
+
+Shows commits upstream has that you don't, newest first.
 
 ### 3. Inspect a commit before deciding
 
 ```bash
-COMMIT=abc1234
-
-# What files did it touch?
-git show --stat $COMMIT
-
-# Full diff
-git show $COMMIT
-
-# Which of those files exist in your fork?
-git show --pretty=format: --name-only $COMMIT | while read f; do
-  [[ -f $f ]] && echo "EXISTS: $f" || echo "DELETED/MISSING: $f"
-done
+omarchy upstream show <commit-ish>
 ```
 
-### 4. Classify the commit
+Outputs:
+- Commit metadata (author, date, stat)
+- File existence check in your fork (`[OK]` / `[MISSING]`)
+- Classification (`SKIP`, `REWRITE`, `EASY`, `REVIEW`)
 
-| Files touched | Verdict | Action |
-|---|---|---|
-| `themes/*`, `config/*`, `default/hypr/*`, `default/waybar/*` | **Easy port** | Cherry-pick directly, fix any Arch refs if present |
-| `bin/omarchy-*` | **Needs rewrite** | Cherry-pick to a temp branch, rewrite internals for xbps/runit/dracut/GRUB |
-| `install/*` | **Needs rewrite** | Same as above — install scripts are Void-native now |
-| `default/limine/*`, `default/pacman/*`, `default/systemd/*` | **Skip** | These directories were deleted; upstream changes here are Arch-only |
-| `migrations/*` | **Skip** | All upstream migrations were deleted; your fork starts fresh |
-| `README.md`, `AGENTS.md`, docs | **Review** | Decide case by case; some docs may still reference Arch |
+Example:
 
-### 5. Cherry-pick with rewrite
+```
+=== Commit ===
+abc1234 Add new theme: tokyo-day
+ themes/tokyo-day/ | 12 files changed
+
+=== File existence ===
+  [OK]      themes/tokyo-day/colors.toml
+  [MISSING] themes/tokyo-day/preview.png
+
+=== Classification ===
+  EASY — likely distro-agnostic config
+```
+
+### 4. Cherry-pick with rewrite
 
 ```bash
-# Create a feature branch for the port
-FEATURE="upstream-some-feature"
-git checkout -b "$FEATURE"
-
-# Cherry-pick the upstream commit (may conflict — that's expected)
-git cherry-pick -x $COMMIT
-# ...resolve conflicts, rewrite Arch-isms for Void...
-
-# Or: apply only the diff, manually selecting hunks
-git show $COMMIT -- '*.lua' '*.conf' | git apply --3way -v
+omarchy upstream port <commit-ish>
 ```
 
-### 6. Adaptation checklist
+This:
+1. Resolves the commit to a full hash
+2. Creates a branch named `upstream-port-<hash>`
+3. Runs `git cherry-pick -x`
+4. If conflicts occur, prints the adaptation checklist inline
 
-When cherry-picking any upstream change, run through this checklist:
-
-- [ ] `pacman` → `xbps-install` / `xbps-remove` / `xbps-query`
-- [ ] `systemctl enable/start` → `ln -sf /etc/sv/SVC /var/service/` or `sv start`
-- [ ] `systemctl --user` → Hyprland autostart.lua or `pkill + restart`
-- [ ] `mkinitcpio` → `dracut --force --regenerate-all`
-- [ ] `limine` / `limine-mkinitcpio` → `grub-mkconfig -o /boot/grub/grub.cfg`
-- [ ] `journalctl -b` → `dmesg | tail` or `svlogd` logs
-- [ ] `/etc/pacman.conf` or `/etc/pacman.d/*` → `/etc/xbps.d/*.conf`
-- [ ] `/etc/systemd/*` → `/etc/sv/*` or `/etc/elogind/*`
-- [ ] Arch package names → Void equivalents (check `install/omarchy-base.packages`)
-- [ ] New upstream commands using systemd/pacman → rewrite for Void or skip
-
-### 7. Test and commit
+After resolving conflicts and adapting for Void:
 
 ```bash
 # Syntax-check modified shell scripts
@@ -112,46 +111,21 @@ Adapted for Void Linux:
 - <what you changed>"
 ```
 
-## Automation Helpers
+### 5. Adaptation checklist
 
-Add these to your shell profile for faster daily use:
+When cherry-picking any upstream change, run through this checklist before
+committing:
 
-```bash
-# Show upstream commits not in your fork
-omarchy-upstream-log() {
-  git -C ~/.local/share/omarchy fetch upstream 2>/dev/null
-  git -C ~/.local/share/omarchy log --oneline HEAD..upstream/main "$@"
-}
-
-# Show files touched by an upstream commit, with fork existence check
-omarchy-upstream-files() {
-  local commit="$1"
-  git -C ~/.local/share/omarchy show --pretty=format: --name-only "$commit" | while read f; do
-    if [[ -f ~/.local/share/omarchy/$f ]]; then
-      echo "  [OK] $f"
-    else
-      echo "  [MISSING] $f"
-    fi
-  done
-}
-
-# Quick classification of a commit's merge difficulty
-omarchy-upstream-classify() {
-  local commit="$1"
-  local files
-  files=$(git -C ~/.local/share/omarchy show --pretty=format: --name-only "$commit")
-
-  if echo "$files" | grep -qE '^migrations/|^default/limine/|^default/pacman/|^default/systemd/'; then
-    echo "SKIP: touches deleted directories"
-  elif echo "$files" | grep -qE '^bin/|^install/'; then
-    echo "REWRITE: touches bin/ or install/ scripts"
-  elif echo "$files" | grep -qE '^themes/|^config/|^default/hypr/|^default/waybar/'; then
-    echo "EASY: likely distro-agnostic config"
-  else
-    echo "REVIEW: check manually"
-  fi
-}
-```
+- [ ] `pacman` → `xbps-install` / `xbps-remove` / `xbps-query`
+- [ ] `systemctl enable/start` → `ln -sf /etc/sv/SVC /var/service/` or `sv start`
+- [ ] `systemctl --user` → Hyprland autostart.lua or `pkill + restart`
+- [ ] `mkinitcpio` → `dracut --force --regenerate-all`
+- [ ] `limine` / `limine-mkinitcpio` → `grub-mkconfig -o /boot/grub/grub.cfg`
+- [ ] `journalctl -b` → `dmesg | tail` or `svlogd` logs
+- [ ] `/etc/pacman.conf` or `/etc/pacman.d/*` → `/etc/xbps.d/*.conf`
+- [ ] `/etc/systemd/*` → `/etc/sv/*` or `/etc/elogind/*`
+- [ ] Arch package names → Void equivalents (check `install/omarchy-base.packages`)
+- [ ] New upstream commands using systemd/pacman → rewrite for Void or skip
 
 ## Port Priority Guide
 
