@@ -85,6 +85,7 @@ mesa-vulkan-intel
 mesa-vulkan-radeon
 
 # Hyprland ecosystem (from Makrennel third-party repo)
+hyprutils
 hyprland
 hypridle
 hyprlock
