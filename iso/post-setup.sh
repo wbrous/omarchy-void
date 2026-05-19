@@ -11,40 +11,31 @@ for svc in dbus elogind seatd polkitd sddm NetworkManager iwd bluetoothd; do
   fi
 done
 
-# Configure GRUB for os-prober (dual-boot support)
-if [[ -f /etc/default/grub ]]; then
-  if ! grep -q "GRUB_DISABLE_OS_PROBER" /etc/default/grub; then
-    echo 'GRUB_DISABLE_OS_PROBER=false' >> /etc/default/grub
-  fi
+# Enable os-prober for Windows dual-boot detection
+if [[ -f /etc/default/grub ]] && ! grep -q "GRUB_DISABLE_OS_PROBER" /etc/default/grub; then
+  echo 'GRUB_DISABLE_OS_PROBER=false' >> /etc/default/grub
 fi
 
-# Configure Plymouth default theme
+# Set Plymouth default theme
 if command -v plymouth-set-default-theme &>/dev/null; then
   plymouth-set-default-theme omarchy 2>/dev/null || true
 fi
 
-# Ensure omarchy user exists for live environment
+# Create live user
 if ! id -u omarchy &>/dev/null; then
   useradd -m -G wheel,audio,video,input,netdev,storage -s /bin/bash omarchy
   echo "omarchy:omarchy" | chpasswd
 fi
 
-# Enable sudo for wheel group
-if [[ -f /etc/sudoers ]]; then
-  if ! grep -q "^%wheel ALL=(ALL:ALL) NOPASSWD: ALL" /etc/sudoers; then
-    echo "%wheel ALL=(ALL:ALL) NOPASSWD: ALL" >> /etc/sudoers
-  fi
+# Enable passwordless sudo for wheel group
+if ! grep -q "^%wheel ALL=(ALL:ALL) NOPASSWD: ALL" /etc/sudoers; then
+  echo "%wheel ALL=(ALL:ALL) NOPASSWD: ALL" >> /etc/sudoers
 fi
 
-# Generate initramfs with dracut
+# Generate initramfs
 dracut --force --regenerate-all
 
-# Configure xbps to use Makrennel hyprland-void repo
-cat > /etc/xbps.d/20-hyprland-void.conf <<'EOF'
-repository=https://raw.githubusercontent.com/Makrennel/hyprland-void/repository-x86_64-glibc
-EOF
-
-# Update xbps repository indexes
+# Sync package indexes (repos already configured via overlay)
 xbps-install -S
 
 echo "Omarchy live environment configured."

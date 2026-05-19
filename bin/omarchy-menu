@@ -77,12 +77,6 @@ install_terminal() {
   present_terminal "omarchy-install-terminal $1"
 }
 
-source_install() {
-  present_terminal "echo 'Installing $1 from source...'; omarchy-pkg-aur-add $2"
-}
-source_install_and_launch() {
-  present_terminal "echo 'Installing $1 from source...'; omarchy-pkg-aur-add $2 && setsid gtk-launch $3"
-
 show_learn_menu() {
   case $(menu "Learn" "  Keybindings\n  Tmux keybindings\n  Omarchy\n  Hyprland\n󰣇  Void\n  Neovim\n󱆃  Bash") in
   *Tmux*) omarchy-menu-tmux-keybindings ;;

@@ -22,6 +22,17 @@ DRACUT_CONF="/etc/dracut.conf.d/omarchy_resume.conf"
 SWAP_FILE="/swap/swapfile"
 GRUB_DEFAULT="/etc/default/grub"
 
+grub_append_cmdline() {
+  local param="$1"
+  if grep -q '^GRUB_CMDLINE_LINUX_DEFAULT=' "$GRUB_DEFAULT" 2>/dev/null; then
+    if ! grep -q "$param" "$GRUB_DEFAULT" 2>/dev/null; then
+      sudo sed -i "s|^GRUB_CMDLINE_LINUX_DEFAULT=\"\(.*\)\"|GRUB_CMDLINE_LINUX_DEFAULT=\"\1 $param\"|" "$GRUB_DEFAULT"
+    fi
+  else
+    echo "GRUB_CMDLINE_LINUX_DEFAULT=\"quiet splash $param\"" | sudo tee -a "$GRUB_DEFAULT" >/dev/null
+  fi
+}
+
 # Check if hibernation is already configured
 if [[ -f $DRACUT_CONF ]] && grep -q 'add_dracutmodules+=" resume "' "$DRACUT_CONF"; then
   # Fix empty resume_offset if btrfs map-swapfile failed during initial setup
@@ -88,13 +99,7 @@ if [[ -f $SWAP_FILE ]]; then
   RESUME_DEVICE=$(findmnt -no SOURCE -T "$SWAP_FILE" | sed 's/\[.*\]//')
   RESUME_OFFSET=$(sudo btrfs inspect-internal map-swapfile -r "$SWAP_FILE")
   if [[ -n $RESUME_OFFSET ]]; then
-    if grep -q '^GRUB_CMDLINE_LINUX_DEFAULT=' "$GRUB_DEFAULT"; then
-      # Append to existing cmdline
-      sudo sed -i "s|^GRUB_CMDLINE_LINUX_DEFAULT=\"\(.*\)\"|GRUB_CMDLINE_LINUX_DEFAULT=\"\1 resume=$RESUME_DEVICE resume_offset=$RESUME_OFFSET\"|" "$GRUB_DEFAULT"
-    else
-      # Add new line
-      echo "GRUB_CMDLINE_LINUX_DEFAULT=\"quiet splash resume=$RESUME_DEVICE resume_offset=$RESUME_OFFSET\"" | sudo tee -a "$GRUB_DEFAULT" >/dev/null
-    fi
+    grub_append_cmdline "resume=$RESUME_DEVICE resume_offset=$RESUME_OFFSET"
   else
     echo "Warning: Could not determine resume offset for $SWAP_FILE" >&2
   fi
@@ -104,11 +109,7 @@ fi
 if grep -q "\[s2idle\]" /sys/power/mem_sleep 2>/dev/null; then
   if ! grep -q 'rtc_cmos.use_acpi_alarm=1' "$GRUB_DEFAULT" 2>/dev/null; then
     echo "Enabling ACPI RTC alarm for s2idle suspend"
-    if grep -q '^GRUB_CMDLINE_LINUX_DEFAULT=' "$GRUB_DEFAULT"; then
-      sudo sed -i 's|^GRUB_CMDLINE_LINUX_DEFAULT="\(.*\)"|GRUB_CMDLINE_LINUX_DEFAULT="\1 rtc_cmos.use_acpi_alarm=1"|' "$GRUB_DEFAULT"
-    else
-      echo 'GRUB_CMDLINE_LINUX_DEFAULT="quiet splash rtc_cmos.use_acpi_alarm=1"' | sudo tee -a "$GRUB_DEFAULT" >/dev/null
-    fi
+    grub_append_cmdline "rtc_cmos.use_acpi_alarm=1"
   fi
 fi
 

@@ -215,7 +215,6 @@ xournalpp
 pinta
 
 # Archive
-p7zip
 
 # Network file sharing
 samba
@@ -236,7 +235,6 @@ gpu-screen-recorder
 satty
 
 # Plymouth theme
-plymouth
 
 # Wiremix (if available)
 wiremix
