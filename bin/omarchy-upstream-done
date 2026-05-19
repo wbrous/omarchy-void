@@ -1,0 +1,121 @@
+#!/bin/bash
+
+# omarchy:summary=Record a completed upstream port in the tracking file
+# omarchy:args=[<commit-ish>] [--skip] [--reason=<reason>]
+# omarchy:examples=omarchy upstream done | omarchy upstream done ed93a047 | omarchy upstream done df821259 --skip --reason="migration only"
+# omarchy:requires-sudo=false
+
+set -euo pipefail
+
+OMARCHY_DIR="${OMARCHY_PATH:-$HOME/.local/share/omarchy}"
+
+# Find repo root for tracking file
+if [[ -f .upstream-tracking.json ]]; then
+  TRACKING_FILE="$(pwd)/.upstream-tracking.json"
+elif [[ -f $OMARCHY_DIR/.upstream-tracking.json ]]; then
+  TRACKING_FILE="$OMARCHY_DIR/.upstream-tracking.json"
+else
+  echo "No tracking file found. Run 'omarchy upstream sync' first." >&2
+  exit 1
+fi
+
+COMMIT=""
+SKIP=false
+REASON=""
+
+for arg in "$@"; do
+  case "$arg" in
+    --skip) SKIP=true ;;
+    --reason=*) REASON="${arg#*=}" ;;
+    --reason) ;; # handled below
+    --help|-h)
+      echo "Usage: omarchy upstream done [<commit>] [--skip] [--reason=<text>]"
+      exit 0
+      ;;
+    *)
+      if [[ -z $COMMIT ]]; then
+        COMMIT="$arg"
+      elif [[ -z $REASON && ${arg-} != --* ]]; then
+        REASON="$arg"
+      fi
+      ;;
+  esac
+done
+
+cd "$OMARCHY_DIR"
+
+# If no commit given, detect from the last upstream-port-* branch
+if [[ -z $COMMIT ]]; then
+  branch=$(git branch --format='%(refname:short)' | grep '^upstream-port-' | sort -t- -k3 -n | tail -1)
+  if [[ -z $branch ]]; then
+    echo "No upstream-port-* branch found and no commit given." >&2
+    exit 1
+  fi
+  COMMIT=${branch#upstream-port-}
+  # Resolve short hash to full
+  FULL=$(git rev-parse --verify "$COMMIT" 2>/dev/null) || {
+    echo "Error: could not resolve '$COMMIT' from branch '$branch'" >&2
+    exit 1
+  }
+else
+  FULL=$(git rev-parse --verify "$COMMIT" 2>/dev/null) || {
+    echo "Error: '$COMMIT' not found" >&2
+    exit 1
+  }
+fi
+
+# Get commit summary
+summary=$(git log -1 --format=%s "$FULL")
+short=${FULL:0:8}
+
+# Determine which upstream branch this commit is on
+branch=""
+for b in master dev omarchy-shell; do
+  if git merge-base --is-ancestor "$FULL" "upstream/$b" 2>/dev/null; then
+    branch="$b"
+    break
+  fi
+done
+
+if [[ -z $branch ]]; then
+  echo "Warning: commit $short not found on any tracked upstream branch." >&2
+  branch="dev"  # default fallback
+fi
+
+# Prompt for adaptation notes if not skipping and no reason given
+if ! $SKIP; then
+  if [[ -z $REASON ]]; then
+    echo "Adaptation notes for $short (press Enter for none):"
+    read -r REASON
+    if [[ -z $REASON ]]; then
+      REASON="None"
+    fi
+  fi
+fi
+
+# Build JSON entry
+tmp=$(mktemp)
+if $SKIP; then
+  if [[ -z $REASON ]]; then
+    REASON="No reason given"
+  fi
+  jq --arg b "$branch" \
+     --arg hash "$FULL" \
+     --arg summary "$summary" \
+     --arg reason "$REASON" \
+     '.branches[$b].skipped += [{upstream_hash:$hash, upstream_summary:$summary, reason:$reason}]' \
+     "$TRACKING_FILE" > "$tmp"
+  echo "Recorded as SKIPPED: $short  $summary"
+else
+  our_hash=$(git rev-parse HEAD)
+  jq --arg b "$branch" \
+     --arg hash "$FULL" \
+     --arg summary "$summary" \
+     --arg our "$our_hash" \
+     --arg adaptation "$REASON" \
+     '.branches[$b].ported += [{upstream_hash:$hash, upstream_summary:$summary, our_hash:$our, adaptation:$adaptation}]' \
+     "$TRACKING_FILE" > "$tmp"
+  echo "Recorded as PORTED: $short  $summary"
+fi
+
+mv "$tmp" "$TRACKING_FILE"

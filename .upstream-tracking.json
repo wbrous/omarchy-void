@@ -1,0 +1,36 @@
+{
+  "upstream_repo": "basecamp/omarchy",
+  "branches": {
+    "master": {
+      "last_checked_hash": "82f99928d06eb9cbae37641f77f75c59c1459404",
+      "last_checked_date": "2026-05-19T16:40:00Z",
+      "ported": [],
+      "skipped": []
+    },
+    "dev": {
+      "last_checked_hash": "ed93a047ee35041b5d7504016f8e32ffc914aefc",
+      "last_checked_date": "2026-05-19T16:40:00Z",
+      "ported": [
+        {
+          "upstream_hash": "ed93a047ee35041b5d7504016f8e32ffc914aefc",
+          "upstream_summary": "Fix power profile race on plug/unplug events",
+          "our_hash": "709962615b0ed250eb2cc44ae0a0a4b3425e5fcb",
+          "adaptation": "None — pure bash change, no Arch-specific references"
+        }
+      ],
+      "skipped": [
+        {
+          "upstream_hash": "df82125953f998f0ba00ab76bf65b6ef8889317b",
+          "upstream_summary": "Enable Docker multi-arch builds by default",
+          "reason": "Partial port: added qemu-user-static to base packages. Migration skipped (fork deleted all migrations)."
+        }
+      ]
+    },
+    "omarchy-shell": {
+      "last_checked_hash": "7ea4e1ab0436ec604f0f1f400913b8fa306aea84",
+      "last_checked_date": "2026-05-19T16:12:32Z",
+      "ported": [],
+      "skipped": []
+    }
+  }
+}

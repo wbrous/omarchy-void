@@ -111,6 +111,21 @@ Adapted for Void Linux:
 - <what you changed>"
 ```
 
+Then record the port in the tracking file:
+
+```bash
+omarchy upstream done              # record current port
+omarchy upstream status            # show all port history
+```
+
+This writes the upstream commit hash, summary, your local merge commit, and
+adaptation notes into `.upstream-tracking.json`. Use `--skip` if you decided
+not to port a commit:
+
+```bash
+omarchy upstream done abc1234 --skip --reason="Arch-only migration, not needed"
+```
+
 ### 5. Adaptation checklist
 
 When cherry-picking any upstream change, run through this checklist before

@@ -1,10 +1,19 @@
 #!/bin/bash
 
-# omarchy:summary=Fetch latest commits from basecamp/omarchy upstream
+# omarchy:summary=Fetch upstream and show new commits since last check
 # omarchy:requires-sudo=false
 # omarchy:examples=omarchy upstream sync
 
 OMARCHY_DIR="${OMARCHY_PATH:-$HOME/.local/share/omarchy}"
+
+# Detect repo root: if we're inside it, use cwd; else use OMARCHY_DIR
+if [[ -f .upstream-tracking.json ]] || git rev-parse --git-dir &>/dev/null; then
+  REPO_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
+else
+  REPO_ROOT="$OMARCHY_DIR"
+fi
+
+TRACKING_FILE="$REPO_ROOT/.upstream-tracking.json"
 
 cd "$OMARCHY_DIR"
 
@@ -15,13 +24,50 @@ fi
 
 git fetch upstream
 
-LOCAL=$(git rev-parse HEAD)
-UPSTREAM=$(git rev-parse upstream/master)
+# Seed tracking file if missing
+if [[ ! -f $TRACKING_FILE ]]; then
+  echo '{"upstream_repo":"basecamp/omarchy","branches":{}}' > "$TRACKING_FILE"
+fi
 
-if [[ $LOCAL == "$UPSTREAM" ]]; then
-  echo "Your fork is up to date with upstream."
-else
-  AHEAD=$(git rev-list --count upstream/master..HEAD)
-  BEHIND=$(git rev-list --count HEAD..upstream/master)
-  echo "Fork is $BEHIND commit(s) behind upstream, $AHEAD commit(s) ahead."
+NOW=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+NEW_COMMITS_FOUND=false
+
+for branch in master dev omarchy-shell; do
+  ref="upstream/$branch"
+  tip=$(git rev-parse "$ref" 2>/dev/null) || continue
+  short_tip=$(git rev-parse --short "$tip")
+
+  last_seen=$(jq -r --arg b "$branch" '.branches[$b].last_checked_hash // empty' "$TRACKING_FILE" 2>/dev/null)
+
+  if [[ -z $last_seen ]]; then
+    echo "[$branch] First check. Tip: $short_tip"
+  elif [[ $last_seen == "$tip" ]]; then
+    echo "[$branch] No new commits."
+    continue
+  else
+    count=$(git rev-list --count "$last_seen..$tip" 2>/dev/null) || count="?"
+    echo "[$branch] $count new commit(s) since last check. Tip: $short_tip"
+    echo ""
+    git log --oneline --no-merges "$last_seen..$tip" | head -20
+    if (( count > 20 )); then
+      echo "  ... and $((count - 20)) more"
+    fi
+    echo ""
+    NEW_COMMITS_FOUND=true
+  fi
+
+  tmp=$(mktemp)
+  jq --arg b "$branch" --arg hash "$tip" --arg date "$NOW" \
+    '.branches[$b].last_checked_hash = $hash | .branches[$b].last_checked_date = $date' \
+    "$TRACKING_FILE" > "$tmp" && mv "$tmp" "$TRACKING_FILE"
+done
+
+echo "---"
+portable=$(jq '[.branches | to_entries[].value.ported[].upstream_hash] | length' "$TRACKING_FILE" 2>/dev/null)
+skipped=$(jq '[.branches | to_entries[].value.skipped[].upstream_hash] | length' "$TRACKING_FILE" 2>/dev/null)
+echo "Ported: ${portable:-0}  |  Skipped: ${skipped:-0}  |  Tracking: $TRACKING_FILE"
+
+if $NEW_COMMITS_FOUND; then
+  echo ""
+  echo "Use 'omarchy upstream show <commit>' to inspect, then 'omarchy upstream port <commit>' to cherry-pick."
 fi

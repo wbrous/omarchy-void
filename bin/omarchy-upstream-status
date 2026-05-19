@@ -1,0 +1,46 @@
+#!/bin/bash
+
+# omarchy:summary=Show port history and current tracking state
+# omarchy:requires-sudo=false
+# omarchy:examples=omarchy upstream status
+
+OMARCHY_DIR="${OMARCHY_PATH:-$HOME/.local/share/omarchy}"
+
+if [[ -f .upstream-tracking.json ]]; then
+  TRACKING_FILE="$(pwd)/.upstream-tracking.json"
+elif [[ -f $OMARCHY_DIR/.upstream-tracking.json ]]; then
+  TRACKING_FILE="$OMARCHY_DIR/.upstream-tracking.json"
+else
+  echo "No tracking file found. Run 'omarchy upstream sync' first." >&2
+  exit 1
+fi
+
+echo "Upstream: $(jq -r '.upstream_repo' "$TRACKING_FILE")"
+echo ""
+
+for branch in master dev omarchy-shell; do
+  date=$(jq -r --arg b "$branch" '.branches[$b].last_checked_date // "never"' "$TRACKING_FILE")
+  hash=$(jq -r --arg b "$branch" '.branches[$b].last_checked_hash // "unknown"' "$TRACKING_FILE")
+  printf "Branch: %s\n  Last checked: %s\n  Tip: %.8s\n\n" "$branch" "$date" "$hash"
+done
+
+echo "=== Ported ==="
+ported=$(jq '[.branches | to_entries[].value.ported[]?] | length' "$TRACKING_FILE")
+if (( ported == 0 )); then
+  echo "  (none)"
+else
+  jq -r '.branches | to_entries[].value.ported[]? |
+    "  " + (.upstream_hash | .[0:8]) + "  " + .upstream_summary + "\n" +
+    "    Adaptation: " + .adaptation' "$TRACKING_FILE"
+fi
+
+echo ""
+echo "=== Skipped ==="
+skipped=$(jq '[.branches | to_entries[].value.skipped[]?] | length' "$TRACKING_FILE")
+if (( skipped == 0 )); then
+  echo "  (none)"
+else
+  jq -r '.branches | to_entries[].value.skipped[]? |
+    "  " + (.upstream_hash | .[0:8]) + "  " + .upstream_summary + "\n" +
+    "    Reason: " + .reason' "$TRACKING_FILE"
+fi
