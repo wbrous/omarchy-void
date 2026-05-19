@@ -98,7 +98,7 @@ sddm
 plymouth
 Waybar
 mako
-swayosd
+SwayOSD
 grim
 slurp
 wl-clipboard
@@ -122,7 +122,7 @@ chromium
 # Media
 mpv
 imv
-imagemagick
+ImageMagick
 
 # System tools
 btop
@@ -156,8 +156,8 @@ ufw
 # Fonts
 fontconfig
 noto-fonts-ttf
-noto-fonts-ttf-emoji
-noto-fonts-ttf-cjk
+noto-fonts-emoji
+noto-fonts-cjk
 
 # Flatpak
 flatpak
@@ -186,7 +186,6 @@ gnome-themes-standard
 gnome-calculator
 gnome-disk-utility
 gvfs-mtp
-gvfs-nfs
 gvfs-smb
 
 # Misc desktop
@@ -211,7 +210,6 @@ libreoffice
 
 # Document tools
 xournalpp
-pinta
 
 # Archive
 
