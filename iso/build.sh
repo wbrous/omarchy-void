@@ -36,6 +36,7 @@ if (( EUID == 0 )); then
   (cd "$MKLIVE_DIR" && ./mklive.sh \
     -a x86_64 \
     -r "$MIRROR_URL" \
+    -r "https://raw.githubusercontent.com/Makrennel/hyprland-void/repository-x86_64-glibc" \
     -p "$ISO_PACKAGES" \
     -I "$SCRIPT_DIR/overlay" \
     -o "$OUTPUT")
@@ -43,6 +44,7 @@ else
   (cd "$MKLIVE_DIR" && sudo ./mklive.sh \
     -a x86_64 \
     -r "$MIRROR_URL" \
+    -r "https://raw.githubusercontent.com/Makrennel/hyprland-void/repository-x86_64-glibc" \
     -p "$ISO_PACKAGES" \
     -I "$SCRIPT_DIR/overlay" \
     -o "$OUTPUT")

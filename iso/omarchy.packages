@@ -61,7 +61,6 @@ bluez
 # Audio
 pipewire
 alsa-pipewire
-pipewire-pulse
 wireplumber
 alsa-utils
 pamixer
