@@ -1,0 +1,18 @@
+#!/bin/bash
+
+# omarchy:summary=Show upstream commits not yet in your fork
+# omarchy:args=[<count>]
+# omarchy:examples=omarchy upstream log | omarchy upstream log 20
+# omarchy:requires-sudo=false
+
+OMARCHY_DIR="${OMARCHY_PATH:-$HOME/.local/share/omarchy}"
+LIMIT="${1:-30}"
+
+cd "$OMARCHY_DIR"
+
+if ! git remote | grep -q '^upstream$'; then
+  echo "Error: upstream remote not configured. Run: omarchy upstream sync" >&2
+  exit 1
+fi
+
+git log --oneline HEAD..upstream/master | head -n "$LIMIT"

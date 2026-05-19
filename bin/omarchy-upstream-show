@@ -1,0 +1,54 @@
+#!/bin/bash
+
+# omarchy:summary=Inspect an upstream commit: files touched, merge difficulty
+# omarchy:args=<commit-ish>
+# omarchy:examples=omarchy upstream show abc1234
+# omarchy:requires-sudo=false
+
+OMARCHY_DIR="${OMARCHY_PATH:-$HOME/.local/share/omarchy}"
+COMMIT="${1:-}"
+
+if [[ -z $COMMIT ]]; then
+  echo "Usage: omarchy upstream show <commit>" >&2
+  exit 1
+fi
+
+cd "$OMARCHY_DIR"
+
+if ! git remote | grep -q '^upstream$'; then
+  echo "Error: upstream remote not configured. Run: omarchy upstream sync" >&2
+  exit 1
+fi
+
+# Resolve to full hash
+FULL=$(git rev-parse --verify "$COMMIT" 2>/dev/null) || {
+  echo "Error: '$COMMIT' not found" >&2
+  exit 1
+}
+
+echo "=== Commit ==="
+git -C "$OMARCHY_DIR" show --stat --oneline "$FULL"
+
+echo ""
+echo "=== File existence in your fork ==="
+git -C "$OMARCHY_DIR" show --pretty=format: --name-only "$FULL" | while read -r f; do
+  if [[ -f $f ]]; then
+    echo "  [OK]      $f"
+  else
+    echo "  [MISSING] $f"
+  fi
+done
+
+echo ""
+echo "=== Classification ==="
+FILES=$(git -C "$OMARCHY_DIR" show --pretty=format: --name-only "$FULL")
+
+if echo "$FILES" | grep -qE '^migrations/|^default/limine/|^default/pacman/|^default/systemd/'; then
+  echo "  SKIP — touches deleted Arch-only directories"
+elif echo "$FILES" | grep -qE '^bin/|^install/'; then
+  echo "  REWRITE — touches bin/ or install/; needs Void adaptation"
+elif echo "$FILES" | grep -qE '^themes/|^config/|^default/hypr/|^default/waybar/'; then
+  echo "  EASY — likely distro-agnostic config/theme"
+else
+  echo "  REVIEW — check manually"
+fi

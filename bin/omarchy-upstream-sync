@@ -1,0 +1,27 @@
+#!/bin/bash
+
+# omarchy:summary=Fetch latest commits from basecamp/omarchy upstream
+# omarchy:requires-sudo=false
+# omarchy:examples=omarchy upstream sync
+
+OMARCHY_DIR="${OMARCHY_PATH:-$HOME/.local/share/omarchy}"
+
+cd "$OMARCHY_DIR"
+
+if ! git remote | grep -q '^upstream$'; then
+  echo "Adding upstream remote: basecamp/omarchy"
+  git remote add upstream https://github.com/basecamp/omarchy.git
+fi
+
+git fetch upstream
+
+LOCAL=$(git rev-parse HEAD)
+UPSTREAM=$(git rev-parse upstream/master)
+
+if [[ $LOCAL == "$UPSTREAM" ]]; then
+  echo "Your fork is up to date with upstream."
+else
+  AHEAD=$(git rev-list --count upstream/master..HEAD)
+  BEHIND=$(git rev-list --count HEAD..upstream/master)
+  echo "Fork is $BEHIND commit(s) behind upstream, $AHEAD commit(s) ahead."
+fi

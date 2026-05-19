@@ -1,0 +1,65 @@
+#!/bin/bash
+
+# omarchy:summary=Cherry-pick an upstream commit into a local feature branch
+# omarchy:args=<commit-ish>
+# omarchy:examples=omarchy upstream port abc1234
+# omarchy:requires-sudo=false
+
+set -euo pipefail
+
+OMARCHY_DIR="${OMARCHY_PATH:-$HOME/.local/share/omarchy}"
+COMMIT="${1:-}"
+
+if [[ -z $COMMIT ]]; then
+  echo "Usage: omarchy upstream port <commit>" >&2
+  exit 1
+fi
+
+cd "$OMARCHY_DIR"
+
+if ! git remote | grep -q '^upstream$'; then
+  echo "Error: upstream remote not configured. Run: omarchy upstream sync" >&2
+  exit 1
+fi
+
+FULL=$(git rev-parse --verify "$COMMIT" 2>/dev/null) || {
+  echo "Error: '$COMMIT' not found" >&2
+  exit 1
+}
+
+BRANCH="upstream-port-${FULL:0:8}"
+
+if git show-branch "$BRANCH" &>/dev/null; then
+  echo "Branch $BRANCH already exists. Checking it out..."
+  git checkout "$BRANCH"
+else
+  git checkout -b "$BRANCH"
+fi
+
+echo ""
+echo "Cherry-picking $FULL from upstream..."
+echo ""
+
+if git cherry-pick -x "$FULL"; then
+  echo ""
+  echo "Clean cherry-pick. Review the diff for Arch-isms to fix:"
+  echo "  git diff HEAD~1"
+  echo ""
+  echo "When ready:"
+  echo "  git commit --amend  # add adaptation notes"
+  echo "  git checkout dev && git merge $BRANCH"
+else
+  echo ""
+  echo "Conflicts expected. Resolve, then:"
+  echo "  git add -A"
+  echo "  git cherry-pick --continue"
+  echo ""
+  echo "Adaptation checklist:"
+  echo "  - pacman → xbps-install / xbps-remove / xbps-query"
+  echo "  - systemctl enable → ln -sf /etc/sv/SVC /var/service/"
+  echo "  - systemctl --user → Hyprland autostart.lua"
+  echo "  - mkinitcpio → dracut --force --regenerate-all"
+  echo "  - limine → grub-mkconfig -o /boot/grub/grub.cfg"
+  echo "  - journalctl -b → dmesg | tail"
+  echo "  - /etc/pacman.* → /etc/xbps.d/*.conf"
+fi
