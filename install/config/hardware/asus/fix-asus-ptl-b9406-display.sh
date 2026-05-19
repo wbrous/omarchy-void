@@ -7,9 +7,9 @@
 # xe.enable_psr=0 knob does not cover Panel Replay.
 
 if omarchy-hw-asus-expertbook-b9406; then
-  sudo mkdir -p /etc/limine-entry-tool.d
-  cat <<EOF | sudo tee /etc/limine-entry-tool.d/asus-expertbook-b9406-display.conf >/dev/null
-# ASUS ExpertBook B9406 (Panther Lake / Xe3) display workaround
-KERNEL_CMDLINE[default]+=" xe.enable_panel_replay=0"
-EOF
+  # GRUB kernel parameter approach (Void uses GRUB, not limine)
+  if ! grep -q "xe.enable_panel_replay=0" /etc/default/grub 2>/dev/null; then
+    sudo sed -i 's|^GRUB_CMDLINE_LINUX_DEFAULT="\(.*\)"|GRUB_CMDLINE_LINUX_DEFAULT="\1 xe.enable_panel_replay=0"|' /etc/default/grub
+    sudo grub-mkconfig -o /boot/grub/grub.cfg
+  fi
 fi

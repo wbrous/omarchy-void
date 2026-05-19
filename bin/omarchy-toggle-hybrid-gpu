@@ -19,7 +19,7 @@ if omarchy-cmd-missing supergfxctl; then
 }
 CONF
 
-  sudo systemctl enable --now supergfxd
+  sudo ln -sf /etc/sv/supergfxd /var/service/
 fi
 
 gpu_mode=$(supergfxctl -g)
@@ -31,11 +31,10 @@ case "$gpu_mode" in
     sudo sed -i "s/\"mode\": \".*\"/\"mode\": \"Hybrid\"/" /etc/supergfxd.conf
 
     # Let hybrid mode be the default after system sleep
-    sudo rm -rf /usr/lib/systemd/system-sleep/force-igpu
+    sudo rm -rf /etc/elogind/system-sleep/force-igpu
 
     # Remove the startup delay override (not needed for Hybrid mode)
-    sudo rm -rf /etc/systemd/system/supergfxd.service.d/delay-start.conf
-
+    sudo rm -rf /etc/sv/supergfxd/conf
     omarchy-system-reboot
   fi
   ;;
@@ -45,15 +44,17 @@ case "$gpu_mode" in
     sudo sed -i "s/\"mode\": \".*\"/\"mode\": \"Integrated\"/" /etc/supergfxd.conf
     sudo sed -i 's/"vfio_enable": false/"vfio_enable": true/' /etc/supergfxd.conf
 
+
+    # FIXME: Void Linux — supergfxd sleep hooks need elogind/runit equivalents
+    # The systemd system-sleep hooks were in default/systemd/ (now deleted)
     # Force igpu mode after system sleep (or dgpu could get activated)
-    sudo mkdir -p /usr/lib/systemd/system-sleep
-    sudo cp -p $OMARCHY_PATH/default/systemd/system-sleep/force-igpu /usr/lib/systemd/system-sleep/
+    # sudo mkdir -p /etc/elogind/system-sleep
+    # sudo cp -p $OMARCHY_PATH/default/elogind/system-sleep/force-igpu /etc/elogind/system-sleep/
 
     # Delay supergfxd startup to avoid race condition with display manager
     # that can cause system freeze when booting in Integrated mode
-    sudo mkdir -p /etc/systemd/system/supergfxd.service.d
-    sudo cp -p $OMARCHY_PATH/default/systemd/system/supergfxd.service.d/delay-start.conf /etc/systemd/system/supergfxd.service.d/
-
+    # sudo mkdir -p /etc/sv/supergfxd/conf
+    # sudo cp -p $OMARCHY_PATH/default/runit/supergfxd/delay-start.conf /etc/sv/supergfxd/conf/
     omarchy-system-reboot
   fi
   ;;

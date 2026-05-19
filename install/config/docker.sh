@@ -11,22 +11,16 @@ sudo tee /etc/docker/daemon.json >/dev/null <<'EOF'
 }
 EOF
 
-# Expose systemd-resolved to our Docker network
-sudo mkdir -p /etc/systemd/resolved.conf.d
-echo -e '[Resolve]\nDNSStubListenerExtra=172.17.0.1' | sudo tee /etc/systemd/resolved.conf.d/20-docker-dns.conf >/dev/null
-sudo systemctl restart systemd-resolved
+# Void Linux does not use systemd-resolved.
+# Configure Docker to use a local DNS forwarder or host resolv.conf.
+# (No systemd-resolved stub to expose.)
 
-# Start Docker on-demand
-sudo systemctl enable docker.socket
+# NOTE: runit has no socket activation. Enable the docker service directly instead.
+# sudo ln -sf /etc/sv/docker /var/service/
 
 # Give this user privileged Docker access
 sudo usermod -aG docker ${USER}
 
-# Prevent Docker from preventing boot for network-online.target
-sudo mkdir -p /etc/systemd/system/docker.service.d
-sudo tee /etc/systemd/system/docker.service.d/no-block-boot.conf <<'EOF'
-[Unit]
-DefaultDependencies=no
-EOF
+# Prevent Docker from blocking boot on network-online.target
+# On runit this is not a concern; services start in parallel.
 
-sudo systemctl daemon-reload

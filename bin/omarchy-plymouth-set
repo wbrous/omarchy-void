@@ -57,11 +57,7 @@ done
 sudo cp -a "$staging_dir/." "$theme_dir/"
 sudo plymouth-set-default-theme omarchy
 
-if omarchy-cmd-present limine-mkinitcpio; then
-  sudo limine-mkinitcpio
-else
-  sudo mkinitcpio -P
-fi
+sudo dracut --force --regenerate-all
 
 # Sync the SDDM login screen with the same colors and logo.
 sddm_dir="/usr/share/sddm/themes/omarchy"

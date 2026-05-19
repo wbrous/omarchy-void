@@ -1,6 +1,6 @@
 if lspci | grep -qi 'nvidia'; then
   # Check which kernel is installed and set appropriate headers package
-  KERNEL_HEADERS="$(pacman -Qqs '^linux(-zen|-lts|-hardened)?$' | head -1)-headers"
+  KERNEL_HEADERS="$(xbps-query -s 'linux[0-9]*' | grep -E '^\*?\s*linux[0-9]+' | head -1 | awk '{print $2}')-headers"
 
   if omarchy-hw-nvidia-gsp; then
     PACKAGES=(nvidia-open-dkms nvidia-utils lib32-nvidia-utils libva-nvidia-driver)
@@ -11,7 +11,7 @@ if lspci | grep -qi 'nvidia'; then
   fi
   # Bail if no supported GPU
   if [[ -z ${PACKAGES+x} ]]; then
-    echo "No compatible driver for your NVIDIA GPU. See: https://wiki.archlinux.org/title/NVIDIA"
+    echo "No compatible driver for your NVIDIA GPU."
     exit 0
   fi
 
@@ -22,10 +22,14 @@ if lspci | grep -qi 'nvidia'; then
 options nvidia_drm modeset=1
 EOF
 
-  # Configure mkinitcpio for early loading
-  sudo tee /etc/mkinitcpio.conf.d/nvidia.conf <<EOF >/dev/null
-MODULES+=(nvidia nvidia_modeset nvidia_uvm nvidia_drm)
+  # Configure dracut for early loading
+  sudo install -d /etc/dracut.conf.d
+  sudo tee /etc/dracut.conf.d/nvidia.conf <<EOF >/dev/null
+add_drivers+=" nvidia nvidia_modeset nvidia_uvm nvidia_drm "
 EOF
+
+  # Regenerate initramfs
+  sudo dracut --force --regenerate-all
 
   # Add NVIDIA environment variables based on GPU architecture
   if [[ $GPU_ARCH = "turing_plus" ]]; then

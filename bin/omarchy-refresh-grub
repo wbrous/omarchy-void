@@ -1,0 +1,7 @@
+#!/bin/bash
+
+# omarchy:summary=Regenerate GRUB bootloader config
+# omarchy:requires-sudo=true
+
+echo "Regenerating GRUB config..."
+sudo grub-mkconfig -o /boot/grub/grub.cfg

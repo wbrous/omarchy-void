@@ -41,12 +41,11 @@ fi
 
 case "$LOG_TYPE" in
 install)
-  ARCHINSTALL_LOG="/var/log/archinstall/install.log"
   OMARCHY_LOG="/var/log/omarchy-install.log"
 
   # Combine system info with logs
   cat "$SYSTEM_INFO" >"$TEMP_LOG"
-  cat $ARCHINSTALL_LOG $OMARCHY_LOG >>"$TEMP_LOG" 2>/dev/null
+  cat "$OMARCHY_LOG" >>"$TEMP_LOG" 2>/dev/null
 
   if [[ ! -s $TEMP_LOG ]]; then
     echo "Error: No install logs found"
@@ -59,7 +58,7 @@ install)
 this-boot)
   # Combine system info with boot logs
   cat "$SYSTEM_INFO" >"$TEMP_LOG"
-  journalctl -b 0 >>"$TEMP_LOG" 2>/dev/null
+  dmesg >>"$TEMP_LOG" 2>/dev/null
 
   if [[ ! -s $TEMP_LOG ]]; then
     echo "Error: No logs found for current boot"
@@ -72,7 +71,7 @@ this-boot)
 last-boot)
   # Combine system info with previous boot logs
   cat "$SYSTEM_INFO" >"$TEMP_LOG"
-  journalctl -b -1 >>"$TEMP_LOG" 2>/dev/null
+  dmesg >>"$TEMP_LOG" 2>/dev/null
 
   if [[ ! -s $TEMP_LOG ]]; then
     echo "Error: No logs found for previous boot"
@@ -88,9 +87,9 @@ installed|system-info)
   {
     echo ""
     echo "========================================="
-    echo "INSTALLED PACKAGES (pacman -Q)"
+    echo "INSTALLED PACKAGES (xbps-query -l)"
     echo "========================================="
-    pacman -Q 2>/dev/null || echo "Failed to get package list"
+    xbps-query -l 2>/dev/null || echo "Failed to get package list"
   } >>"$TEMP_LOG"
 
   if [[ ! -s $TEMP_LOG ]]; then

@@ -33,15 +33,14 @@ else
   fi
 fi
 
-# Run LocalSend in its own systemd service (detached from terminal)
-# Convert newline-separated files to space-separated arguments
+# Run LocalSend detached from terminal
 if [[ $MODE != "clipboard" ]] && echo "$FILES" | grep -q $'\n'; then
   # Multiple files selected - convert newlines to array
   readarray -t FILE_ARRAY <<<"$FILES"
-  systemd-run --user --quiet --collect localsend --headless send "${FILE_ARRAY[@]}"
+  nohup localsend --headless send "${FILE_ARRAY[@]}" >/dev/null 2>&1 &
 else
   # Single file or clipboard mode
-  systemd-run --user --quiet --collect localsend --headless send "$FILES"
+  nohup localsend --headless send "$FILES" >/dev/null 2>&1 &
 fi
 
 # Note: Temporary file will remain until system cleanup for clipboard mode

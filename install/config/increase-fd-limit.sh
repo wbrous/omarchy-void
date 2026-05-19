@@ -1,11 +1,8 @@
-# Raise soft file descriptor limit from systemd's default of 1024 to 65536
-# so dev tools (VS Code, Docker, dev servers, databases) get the headroom they need
-sudo mkdir -p /etc/systemd/system.conf.d /etc/systemd/user.conf.d
+# Raise soft file descriptor limit from the default of 1024 to 1048576
+# so dev tools (VS Code:, Docker, dev servers, databases) get the headroom they need
+sudo install -d /etc/security/limits.d
 
-sudo tee /etc/systemd/system.conf.d/99-omarchy-nofile.conf >/dev/null <<'EOF'
-[Manager]
-DefaultLimitNOFILE=65536:524288
+sudo tee /etc/security/limits.d/omarchy.conf >/dev/null <<'EOF'
+* soft nofile 1048576
+* hard nofile 1048576
 EOF
-
-sudo cp /etc/systemd/system.conf.d/99-omarchy-nofile.conf \
-        /etc/systemd/user.conf.d/99-omarchy-nofile.conf

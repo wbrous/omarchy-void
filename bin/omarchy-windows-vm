@@ -220,7 +220,7 @@ EOF
   if ! docker-compose -f "$COMPOSE_FILE" up -d 2>&1; then
     echo "❌ Failed to start Windows VM!"
     echo "   Common issues:"
-    echo "   - Docker daemon not running: sudo systemctl start docker"
+    echo "   - Docker daemon not running: sudo sv start docker"
     echo "   - Port already in use: check if another VM is running"
     echo "   - Permission issues: make sure you're in the docker group"
     exit 1

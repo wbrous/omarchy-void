@@ -1,11 +1,12 @@
 # Starting the installer with OMARCHY_CHROOT_INSTALL=1 will put it into chroot mode
-chrootable_systemctl_enable() {
+chrootable_runit_enable() {
+  local svc="$1"
   if [[ -n ${OMARCHY_CHROOT_INSTALL:-} ]]; then
-    sudo systemctl enable $1
+    ln -sf "/etc/sv/$svc" "$CHROOT/var/service/"
   else
-    sudo systemctl enable --now $1
+    sudo ln -sf "/etc/sv/$svc" /var/service/
   fi
 }
 
 # Export the function so it's available in subshells
-export -f chrootable_systemctl_enable
+export -f chrootable_runit_enable

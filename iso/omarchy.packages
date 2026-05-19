@@ -1,0 +1,242 @@
+# Omarchy-Void ISO package list
+# Packages pre-installed in the live environment
+
+# Base system
+base-system
+base-devel
+runit-void
+
+# Kernel and firmware
+linux6.6
+linux6.6-headers
+linux-firmware
+
+# Boot
+grub
+grub-i386-efi
+grub-x86_64-efi
+os-prober
+efibootmgr
+dracut
+
+# Filesystem tools
+btrfs-progs
+dosfstools
+exfatprogs
+ntfs-3g
+xfsprogs
+
+# Compression
+lz4
+zstd
+xz
+p7zip
+unzip
+
+# Disk and partition tools
+parted
+gptfdisk
+lvm2
+cryptsetup
+
+# Network
+NetworkManager
+NetworkManager-openvpn
+dhcpcd
+iwd
+wpa_supplicant
+openresolv
+curl
+wget
+openssh
+iputils
+iproute2
+ethtool
+iw
+wireless_tools
+
+# Bluetooth
+bluez
+
+# Audio
+pipewire
+pipewire-alsa
+pipewire-pulse
+wireplumber
+alsa-utils
+pamixer
+
+# Print
+cups
+cups-filters
+cups-pdf
+system-config-printer
+
+# Security
+polkit
+polkit-gnome
+gnome-keyring
+elogind
+seatd
+
+# Display / Wayland
+xorg-server-xwayland
+mesa-dri
+mesa-vulkan-intel
+mesa-vulkan-radeon
+
+# Hyprland ecosystem (from Makrennel third-party repo)
+hyprland
+hypridle
+hyprlock
+hyprpicker
+xdg-desktop-portal-hyprland
+xdg-desktop-portal-gtk
+xdg-desktop-portal
+
+# Omarchy desktop components
+sddm
+plymouth
+waybar
+mako
+swayosd
+grim
+slurp
+wl-clipboard
+swaybg
+brightnessctl
+gtk-layer-shell
+
+# Terminal, shell, editors
+foot
+alacritty
+zsh
+neovim
+
+# File manager
+nautilus
+sushi
+
+# Browser
+chromium
+
+# Media
+mpv
+imv
+imagemagick
+
+# System tools
+btop
+eza
+fd
+fzf
+jq
+ripgrep
+zoxide
+starship
+gum
+socat
+tmux
+man-db
+tree-sitter-cli
+whois
+
+# System utilities
+inxi
+fastfetch
+psmisc
+procps-ng
+logrotate
+cronie
+chrony
+upower
+
+# Firewall
+ufw
+
+# Fonts
+fontconfig
+noto-fonts-ttf
+noto-fonts-ttf-emoji
+noto-fonts-ttf-cjk
+
+# Flatpak
+flatpak
+
+# Snapper
+snapper
+
+# Void repos
+void-repo-nonfree
+void-repo-multilib
+
+# Python
+python3
+python3-pip
+python3-gobject
+
+# Build tools
+clang
+rust
+
+cargo
+git
+
+# Theming
+gnome-themes-standard
+gnome-calculator
+gnome-disk-utility
+gvfs-mtp
+gvfs-nfs
+gvfs-smb
+
+# Misc desktop
+xdg-utils
+xdg-user-dirs
+libsecret
+libyaml
+libqalculate
+libnotify
+libdbusmenu-glib
+libayatana-appindicator
+
+# Timezone
+tzdata
+
+# Lua
+lua
+luarocks
+
+# LibreOffice
+libreoffice
+
+# Document tools
+xournalpp
+pinta
+
+# Archive
+p7zip
+
+# Network file sharing
+samba
+nfs-utils
+
+# Input
+libinput
+libevdev
+
+# Gamescope / gaming
+gamescope
+gamemode
+
+# GPU recording
+gpu-screen-recorder
+
+# Screenshot annotation
+satty
+
+# Plymouth theme
+plymouth
+
+# Wiremix (if available)
+wiremix

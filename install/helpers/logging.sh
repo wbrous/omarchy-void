@@ -72,19 +72,19 @@ stop_install_log() {
     echo "" >>"$OMARCHY_INSTALL_LOG_FILE"
     echo "=== Installation Time Summary ===" >>"$OMARCHY_INSTALL_LOG_FILE"
 
-    if [[ -f "/var/log/archinstall/install.log" ]]; then
-      ARCHINSTALL_START=$(grep -m1 '^\[' /var/log/archinstall/install.log 2>/dev/null | sed 's/^\[\([^]]*\)\].*/\1/' || true)
-      ARCHINSTALL_END=$(grep 'Installation completed without any errors' /var/log/archinstall/install.log 2>/dev/null | sed 's/^\[\([^]]*\)\].*/\1/' || true)
+    if [[ -f "/var/log/void-installer.log" ]]; then
+      INSTALLER_START=$(grep -m1 '^\[' /var/log/void-installer.log 2>/dev/null | sed 's/^\[\([^]]*\)\].*/\1/' || true)
+      INSTALLER_END=$(grep 'Installation completed without any errors' /var/log/void-installer.log 2>/dev/null | sed 's/^\[\([^]]*\)\].*/\1/' || true)
 
-      if [[ -n $ARCHINSTALL_START ]] && [[ -n $ARCHINSTALL_END ]]; then
-        ARCH_START_EPOCH=$(date -d "$ARCHINSTALL_START" +%s)
-        ARCH_END_EPOCH=$(date -d "$ARCHINSTALL_END" +%s)
-        ARCH_DURATION=$((ARCH_END_EPOCH - ARCH_START_EPOCH))
+      if [[ -n $INSTALLER_START ]] && [[ -n $INSTALLER_END ]]; then
+        INSTALLER_START_EPOCH=$(date -d "$INSTALLER_START" +%s)
+        INSTALLER_END_EPOCH=$(date -d "$INSTALLER_END" +%s)
+        INSTALLER_DURATION=$((INSTALLER_END_EPOCH - INSTALLER_START_EPOCH))
 
-        ARCH_MINS=$((ARCH_DURATION / 60))
-        ARCH_SECS=$((ARCH_DURATION % 60))
+        INSTALLER_MINS=$((INSTALLER_DURATION / 60))
+        INSTALLER_SECS=$((INSTALLER_DURATION % 60))
 
-        echo "Archinstall: ${ARCH_MINS}m ${ARCH_SECS}s" >>"$OMARCHY_INSTALL_LOG_FILE"
+        echo "Base install: ${INSTALLER_MINS}m ${INSTALLER_SECS}s" >>"$OMARCHY_INSTALL_LOG_FILE"
       fi
     fi
 
@@ -98,8 +98,8 @@ stop_install_log() {
 
       echo "Omarchy:     ${OMARCHY_MINS}m ${OMARCHY_SECS}s" >>"$OMARCHY_INSTALL_LOG_FILE"
 
-      if [[ -n $ARCH_DURATION ]]; then
-        TOTAL_DURATION=$((ARCH_DURATION + OMARCHY_DURATION))
+      if [[ -n $INSTALLER_DURATION ]]; then
+        TOTAL_DURATION=$((INSTALLER_DURATION + OMARCHY_DURATION))
         TOTAL_MINS=$((TOTAL_DURATION / 60))
         TOTAL_SECS=$((TOTAL_DURATION % 60))
         echo "Total:       ${TOTAL_MINS}m ${TOTAL_SECS}s" >>"$OMARCHY_INSTALL_LOG_FILE"

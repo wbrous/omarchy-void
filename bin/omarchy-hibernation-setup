@@ -18,28 +18,21 @@ if [[ ! -f /sys/power/image_size ]]; then
   exit 0
 fi
 
-# When --no-rebuild is set, the caller is responsible for the UKI rebuild
-# (e.g. running before limine-mkinitcpio-hook is installed during initial
-# install), so we only require limine-mkinitcpio when we'd invoke it ourselves.
-if ! $NO_REBUILD && ! command -v limine-mkinitcpio &>/dev/null; then
-  echo "Skipping hibernation setup (requires Limine bootloader)"
-  exit 0
-fi
-
-MKINITCPIO_CONF="/etc/mkinitcpio.conf.d/omarchy_resume.conf"
+DRACUT_CONF="/etc/dracut.conf.d/omarchy_resume.conf"
 SWAP_FILE="/swap/swapfile"
-RESUME_DROP_IN="/etc/limine-entry-tool.d/resume.conf"
+GRUB_DEFAULT="/etc/default/grub"
 
 # Check if hibernation is already configured
-if [[ -f $MKINITCPIO_CONF ]] && grep -q "^HOOKS+=(resume)$" "$MKINITCPIO_CONF"; then
+if [[ -f $DRACUT_CONF ]] && grep -q 'add_dracutmodules+=" resume "' "$DRACUT_CONF"; then
   # Fix empty resume_offset if btrfs map-swapfile failed during initial setup
-  if [[ -f $RESUME_DROP_IN ]] && grep -q 'resume_offset="$' "$RESUME_DROP_IN" && [[ -f $SWAP_FILE ]]; then
-    RESUME_OFFSET=$(sudo btrfs inspect-internal map-swapfile -r "$SWAP_FILE" 2>/dev/null)
-    if [[ -n $RESUME_OFFSET ]]; then
-      echo "Fixing empty resume_offset ($RESUME_OFFSET)"
-      sudo sed -i "s/resume_offset=\"$/resume_offset=$RESUME_OFFSET\"/" "$RESUME_DROP_IN"
-      sudo sed -i "s/resume_offset=\"$/resume_offset=$RESUME_OFFSET\"/" /etc/default/limine
-      $NO_REBUILD || sudo limine-mkinitcpio
+  if [[ -f $SWAP_FILE ]] && grep -q 'resume_offset=' "$GRUB_DEFAULT"; then
+    if grep -q 'resume_offset=$' "$GRUB_DEFAULT" 2>/dev/null || ! grep -q 'resume_offset=' "$GRUB_DEFAULT" 2>/dev/null; then
+      RESUME_OFFSET=$(sudo btrfs inspect-internal map-swapfile -r "$SWAP_FILE" 2>/dev/null)
+      if [[ -n $RESUME_OFFSET ]]; then
+        echo "Fixing empty resume_offset ($RESUME_OFFSET)"
+        sudo sed -i "s/resume_offset=[^ ]*/resume_offset=$RESUME_OFFSET/" "$GRUB_DEFAULT"
+        $NO_REBUILD || { sudo dracut --force --regenerate-all; sudo grub-mkconfig -o /boot/grub/grub.cfg; }
+      fi
     fi
   fi
   echo "Hibernation is already set up"
@@ -82,25 +75,26 @@ if ! swapon --show | grep -q "$SWAP_FILE"; then
   sudo swapon -p 0 "$SWAP_FILE"
 fi
 
-# Add resume hook to mkinitcpio
-sudo mkdir -p /etc/mkinitcpio.conf.d
-echo "Adding resume hook to $MKINITCPIO_CONF"
-echo "HOOKS+=(resume)" | sudo tee "$MKINITCPIO_CONF" >/dev/null
+# Add resume module to dracut
+sudo mkdir -p /etc/dracut.conf.d
+echo "Adding resume module to $DRACUT_CONF"
+echo 'add_dracutmodules+=" resume "' | sudo tee "$DRACUT_CONF" >/dev/null
 
-# Ensure keyboard backlight doesn't prevent sleep
-sudo cp -p "$OMARCHY_PATH/default/systemd/system-sleep/keyboard-backlight" /usr/lib/systemd/system-sleep/
-
-# Add resume= kernel parameters so the initramfs resume hook knows where to find the
+# Add resume= kernel parameters so the initramfs resume module knows where to find the
 # hibernation image. Without these, resume happens late (after GPU drivers load) and fails.
-if [[ ! -f $RESUME_DROP_IN ]]; then
-  echo "Adding resume kernel parameters"
+if [[ -f $SWAP_FILE ]]; then
+  echo "Adding resume kernel parameters to GRUB"
   sudo swapon -p 0 "$SWAP_FILE" 2>/dev/null
   RESUME_DEVICE=$(findmnt -no SOURCE -T "$SWAP_FILE" | sed 's/\[.*\]//')
   RESUME_OFFSET=$(sudo btrfs inspect-internal map-swapfile -r "$SWAP_FILE")
   if [[ -n $RESUME_OFFSET ]]; then
-    sudo mkdir -p /etc/limine-entry-tool.d
-    echo "KERNEL_CMDLINE[default]+=\" resume=$RESUME_DEVICE resume_offset=$RESUME_OFFSET\"" | sudo tee "$RESUME_DROP_IN" >/dev/null
-    sudo tee -a /etc/default/limine < "$RESUME_DROP_IN" >/dev/null
+    if grep -q '^GRUB_CMDLINE_LINUX_DEFAULT=' "$GRUB_DEFAULT"; then
+      # Append to existing cmdline
+      sudo sed -i "s|^GRUB_CMDLINE_LINUX_DEFAULT=\"\(.*\)\"|GRUB_CMDLINE_LINUX_DEFAULT=\"\1 resume=$RESUME_DEVICE resume_offset=$RESUME_OFFSET\"|" "$GRUB_DEFAULT"
+    else
+      # Add new line
+      echo "GRUB_CMDLINE_LINUX_DEFAULT=\"quiet splash resume=$RESUME_DEVICE resume_offset=$RESUME_OFFSET\"" | sudo tee -a "$GRUB_DEFAULT" >/dev/null
+    fi
   else
     echo "Warning: Could not determine resume offset for $SWAP_FILE" >&2
   fi
@@ -108,22 +102,21 @@ fi
 
 # Use ACPI alarm for RTC wakeup on s2idle systems (needed for suspend-then-hibernate)
 if grep -q "\[s2idle\]" /sys/power/mem_sleep 2>/dev/null; then
-  LIMINE_DROP_IN="/etc/limine-entry-tool.d/rtc-alarm.conf"
-  if [[ ! -f $LIMINE_DROP_IN ]]; then
+  if ! grep -q 'rtc_cmos.use_acpi_alarm=1' "$GRUB_DEFAULT" 2>/dev/null; then
     echo "Enabling ACPI RTC alarm for s2idle suspend"
-    sudo mkdir -p /etc/limine-entry-tool.d
-    echo 'KERNEL_CMDLINE[default]+=" rtc_cmos.use_acpi_alarm=1"' | sudo tee "$LIMINE_DROP_IN" >/dev/null
-    sudo tee -a /etc/default/limine < "$LIMINE_DROP_IN" >/dev/null
+    if grep -q '^GRUB_CMDLINE_LINUX_DEFAULT=' "$GRUB_DEFAULT"; then
+      sudo sed -i 's|^GRUB_CMDLINE_LINUX_DEFAULT="\(.*\)"|GRUB_CMDLINE_LINUX_DEFAULT="\1 rtc_cmos.use_acpi_alarm=1"|' "$GRUB_DEFAULT"
+    else
+      echo 'GRUB_CMDLINE_LINUX_DEFAULT="quiet splash rtc_cmos.use_acpi_alarm=1"' | sudo tee -a "$GRUB_DEFAULT" >/dev/null
+    fi
   fi
 fi
 
 if ! $NO_REBUILD; then
-  # limine-mkinitcpio rebuilds initramfs/UKI for all kernels and updates the
-  # /boot/limine.conf entries via limine-entry-tool. The limine bootloader
-  # binary on the ESP doesn't change here, so we don't need limine-update
-  # (which would also re-deploy the binary and rebuild a second time).
   echo "Regenerating initramfs..."
-  sudo limine-mkinitcpio
+  sudo dracut --force --regenerate-all
+  echo "Regenerating GRUB config..."
+  sudo grub-mkconfig -o /boot/grub/grub.cfg
   echo
 fi
 

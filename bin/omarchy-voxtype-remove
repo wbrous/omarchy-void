@@ -10,9 +10,11 @@ set -e
 if omarchy-cmd-present voxtype; then
   echo "Uninstall Voxtype to remove dictation."
 
-  # Remove services
-  systemctl --user disable --now voxtype.service 2>/dev/null || true
-  systemctl --user daemon-reload
+  # Remove from Hyprland autostart
+  autostart_file="$HOME/.config/hypr/autostart.lua"
+  if [[ -f $autostart_file ]]; then
+    grep -v 'voxtype' "$autostart_file" > "${autostart_file}.tmp" && mv "${autostart_file}.tmp" "$autostart_file" || true
+  fi
 
   # Remove packages and configs
   omarchy-pkg-drop voxtype-bin

@@ -9,7 +9,6 @@ set -e
 hyprctl dispatch 'hl.dsp.window.tag({ tag = "+noidle" })' &>/dev/null || hyprctl dispatch tagwindow +noidle &>/dev/null || true
 
 # Perform all update steps
-omarchy-update-keyring
 omarchy-update-available-reset
 omarchy-update-system-pkgs
 omarchy-migrate

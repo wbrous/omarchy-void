@@ -34,6 +34,11 @@ create)
   echo
   ;;
 restore)
-  sudo limine-snapper-restore
+  echo -e "\e[32mRestore system snapshot\e[0m"
+  sudo snapper -c root rollback
+  sudo grub-mkconfig -o /boot/grub/grub.cfg
+  if gum confirm "Reboot to complete restore?"; then
+    omarchy-system-reboot
+  fi
   ;;
 esac

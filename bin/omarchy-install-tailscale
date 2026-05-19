@@ -7,7 +7,8 @@ echo -e "\nInstalling Tailscale..."
 omarchy-pkg-add tailscale
 
 echo -e "\nStarting Tailscale..."
-sudo systemctl enable --now tailscaled.service
+sudo ln -sf /etc/sv/tailscaled /var/service/
+sudo sv start tailscaled
 sudo tailscale up --accept-routes
 
 omarchy-webapp-install "Tailscale" "https://login.tailscale.com/admin/machines" https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/png/tailscale-light.png

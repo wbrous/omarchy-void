@@ -23,16 +23,16 @@ OMARCHY_REF="${OMARCHY_REF:-master}"
 # Set mirror based on branch
 if [[ $OMARCHY_REF == "dev" ]]; then
   export OMARCHY_MIRROR=edge
-  echo 'Server = https://mirror.omarchy.org/$repo/os/$arch' | sudo tee /etc/pacman.d/mirrorlist >/dev/null
+  echo 'repository=https://mirror.omarchy.org/current' | sudo tee /etc/xbps.d/00-omarchy-mirror.conf >/dev/null
 elif [[ $OMARCHY_REF == "rc" ]]; then
   export OMARCHY_MIRROR=rc
-  echo 'Server = https://rc-mirror.omarchy.org/$repo/os/$arch' | sudo tee /etc/pacman.d/mirrorlist >/dev/null
+  echo 'repository=https://rc-mirror.omarchy.org/current' | sudo tee /etc/xbps.d/00-omarchy-mirror.conf >/dev/null
 else
   export OMARCHY_MIRROR=stable
-  echo 'Server = https://stable-mirror.omarchy.org/$repo/os/$arch' | sudo tee /etc/pacman.d/mirrorlist >/dev/null
+  echo 'repository=https://stable-mirror.omarchy.org/current' | sudo tee /etc/xbps.d/00-omarchy-mirror.conf >/dev/null
 fi
 
-sudo pacman -Syu --noconfirm --needed git
+sudo xbps-install -Sy git
 
 # Use custom repo if specified, otherwise default to basecamp/omarchy
 OMARCHY_REPO="${OMARCHY_REPO:-basecamp/omarchy}"

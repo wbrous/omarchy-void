@@ -3,10 +3,11 @@
 # omarchy:summary=Remove hibernation setup including swap and boot resume settings
 # omarchy:requires-sudo=true
 
-MKINITCPIO_CONF="/etc/mkinitcpio.conf.d/omarchy_resume.conf"
+DRACUT_CONF="/etc/dracut.conf.d/omarchy_resume.conf"
+GRUB_DEFAULT="/etc/default/grub"
 
 # Check if hibernation is configured
-if [[ ! -f $MKINITCPIO_CONF ]] || ! grep -q "^HOOKS+=(resume)$" "$MKINITCPIO_CONF"; then
+if [[ ! -f $DRACUT_CONF ]] || ! grep -q 'add_dracutmodules+=" resume "' "$DRACUT_CONF"; then
   echo "Hibernation is not set up"
   exit 0
 fi
@@ -44,11 +45,22 @@ if grep -Fq "$SWAP_FILE" /etc/fstab; then
   sudo sed -i '/^# Btrfs swapfile for system hibernation$/d' /etc/fstab
 fi
 
-# Remove mkinitcpio resume hook
-echo "Removing resume hook"
-sudo rm "$MKINITCPIO_CONF"
+# Remove dracut resume module
+echo "Removing resume module"
+sudo rm "$DRACUT_CONF"
+
+# Remove resume kernel parameters from GRUB
+if [[ -f $GRUB_DEFAULT ]]; then
+  echo "Removing resume kernel parameters from GRUB"
+  sudo sed -i 's/ resume=[^ ]*//g' "$GRUB_DEFAULT"
+  sudo sed -i 's/ resume_offset=[^ ]*//g' "$GRUB_DEFAULT"
+  sudo sed -i 's/ rtc_cmos.use_acpi_alarm=[^ ]*//g' "$GRUB_DEFAULT"
+fi
 
 echo "Regenerating initramfs..."
-sudo limine-mkinitcpio
+sudo dracut --force --regenerate-all
+
+echo "Regenerating GRUB config..."
+sudo grub-mkconfig -o /boot/grub/grub.cfg
 
 echo "Hibernation removed"

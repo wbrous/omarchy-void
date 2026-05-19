@@ -76,7 +76,7 @@ enable_hyprland_autostart() {
 
 echo "Installing Sunshine..."
 omarchy-pkg-add sunshine
-systemctl --user enable --now sunshine
+sudo ln -sf /etc/sv/sunshine /var/service/
 
 echo "Opening Sunshine firewall ports..."
 open_ufw_ports

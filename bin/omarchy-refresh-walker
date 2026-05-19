@@ -5,11 +5,11 @@
 mkdir -p ~/.config/autostart/
 cp $OMARCHY_PATH/default/walker/walker.desktop ~/.config/autostart/
 
-# And restarts if it crashes or is killed
-mkdir -p ~/.config/systemd/user/app-walker@autostart.service.d/
-cp $OMARCHY_PATH/default/walker/restart.conf ~/.config/systemd/user/app-walker@autostart.service.d/restart.conf
-
-systemctl --user daemon-reload
+# Add walker to Hyprland autostart for restart-on-crash behavior
+autostart_file="$HOME/.config/hypr/autostart.lua"
+if [[ -f $autostart_file ]] && ! grep -q "walker --gapplication-service" "$autostart_file" 2>/dev/null; then
+  echo 'o.launch_on_start("walker --gapplication-service")' >> "$autostart_file"
+fi
 
 # Refresh configs
 omarchy-refresh-config walker/config.toml

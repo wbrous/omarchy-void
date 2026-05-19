@@ -4,4 +4,4 @@
 # omarchy:requires-sudo=true
 
 echo "Updating time..."
-sudo systemctl restart systemd-timesyncd
+sudo sv restart chronyd

@@ -3,16 +3,6 @@
 # omarchy:summary=Install the NordVPN service with optional GUI.
 # omarchy:requires-sudo=true
 
-echo "Installing NordVPN..."
-omarchy-pkg-aur-add nordvpn-bin
-
-echo "Enabling NordVPN daemon..."
-sudo systemctl enable --now nordvpnd
-
-echo "Adding user to nordvpn group..."
-sudo usermod -aG nordvpn "$USER"
-
-echo -e "\nNordVPN installed! After reboot, run 'nordvpn login' to authenticate."
-
-echo
-gum confirm "Reboot now to make NordVPN usable?" && omarchy-system-reboot
+echo "NordVPN is not available in the official Void Linux repositories."
+echo "You can build it from source using xbps-src if needed."
+exit 1

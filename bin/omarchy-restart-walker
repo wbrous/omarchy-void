@@ -3,22 +3,15 @@
 # omarchy:summary=Restart Walker and related user services
 
 restart_services() {
-  if systemctl --user is-enabled elephant.service &>/dev/null; then
-    systemctl --user restart elephant.service
-  fi
-
-  if systemctl --user is-enabled app-walker@autostart.service &>/dev/null; then
-    systemctl --user restart app-walker@autostart.service
-  else
-    echo -e "\e[31mUnable to restart Walker -- RESTART MANUALLY\e[0m"
-  fi
+  pkill -x elephant || true
+  pkill -x walker || true
+  elephant --gapplication-service >/dev/null 2>&1 &
+  walker --gapplication-service >/dev/null 2>&1 &
 }
 
 if (( EUID == 0 )); then
   SCRIPT_OWNER=$(stat -c '%U' "$0")
-  USER_UID=$(id -u "$SCRIPT_OWNER")
-  systemd-run --uid="$SCRIPT_OWNER" --setenv=XDG_RUNTIME_DIR="/run/user/$USER_UID" \
-    bash -c "$(declare -f restart_services); restart_services"
+  su - "$SCRIPT_OWNER" -c "$(declare -f restart_services); restart_services"
 else
   restart_services
 fi

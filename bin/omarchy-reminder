@@ -20,52 +20,34 @@ format_remaining() {
   fi
 }
 
-parse_systemd_timespan() {
-  local timespan="$1"
-  local total=0
-  local value unit whole
-
-  while read -r value unit; do
-    whole=${value%.*}
-
-    case $unit in
-    d) total=$((total + whole * 86400)) ;;
-    h) total=$((total + whole * 3600)) ;;
-    min) total=$((total + whole * 60)) ;;
-    s) total=$((total + whole)) ;;
-    ms | us) ;;
-    esac
-  done < <(grep -oE '[0-9]+([.][0-9]+)?(d|h|min|s|ms|us)' <<<"$timespan" | sed -E 's/^([0-9.]+)([a-z]+)$/\1 \2/')
-
-  echo "$total"
-}
-
 show_reminders() {
-  local timer next remaining body=""
+  local body="" now=$(date +%s)
   local reminder_dir="${XDG_RUNTIME_DIR:-/tmp}/omarchy-reminders"
-  local reminder_message=""
-  local now=$(date +%s)
 
-  while IFS=$'\t' read -r timer next; do
-    [[ -z $timer || -z $next ]] && continue
+  for job_file in "$reminder_dir"/omarchy-reminder-*.job; do
+    [[ -f $job_file ]] || continue
 
-    next=$((next / 1000000))
-    ((next <= now)) && continue
+    local unit=${job_file##*/}
+    unit=${unit%.job}
+    local message_file="$reminder_dir/$unit.message"
+    local scheduled_epoch reminder_message reminder_minutes
 
-    remaining=$((next - now))
-    reminder=${timer%.timer}
-    reminder=${reminder#omarchy-reminder-}
-    set_at=${reminder##*-}
+    scheduled_epoch=$(awk '{print $NF}' "$job_file")
+    remaining=$((scheduled_epoch - now))
+    ((remaining <= 0)) && continue
+
+    reminder=${unit#omarchy-reminder-}
     reminder_minutes=${reminder%%m-*}
+
     reminder_message=""
-    [[ -f $reminder_dir/${timer%.timer}.message ]] && reminder_message=$(<"$reminder_dir/${timer%.timer}.message")
+    [[ -f $message_file ]] && reminder_message=$(<"$message_file")
 
     if [[ -n $reminder_message ]]; then
-      body+="$reminder_message in $(format_remaining $remaining) ($(date -d "@$next" +%-H:%M))"$'\n'
+      body+="$reminder_message in $(format_remaining $remaining) ($(date -d "@$scheduled_epoch" +%-H:%M))"$'\n'
     else
-      body+="${reminder_minutes}-min reminder in $(format_remaining $remaining) ($(date -d "@$next" +%-H:%M))"$'\n'
+      body+="${reminder_minutes}-min reminder in $(format_remaining $remaining) ($(date -d "@$scheduled_epoch" +%-H:%M))"$'\n'
     fi
-  done < <(systemctl --user list-timers --all --output=json "omarchy-reminder-*.timer" 2>/dev/null | jq -r '.[] | [.unit, .next] | @tsv')
+  done
 
   if [[ -z $body ]]; then
     omarchy-notification-send -g 󰔛 "Upcoming reminders" "No outstanding reminders"
@@ -75,15 +57,16 @@ show_reminders() {
 }
 
 clear_reminders() {
-  local units
   local reminder_dir="${XDG_RUNTIME_DIR:-/tmp}/omarchy-reminders"
 
-  units=$(systemctl --user list-timers --all --no-legend --no-pager "omarchy-reminder-*.timer" 2>/dev/null | awk '{ print $(NF - 1), $NF }')
+  for job_file in "$reminder_dir"/omarchy-reminder-*.job; do
+    [[ -f $job_file ]] || continue
+    local job_num
+    job_num=$(awk '{print $1}' "$job_file")
+    [[ -n $job_num && $job_num =~ ^[0-9]+$ ]] && atrm "$job_num" 2>/dev/null || true
+  done
 
-  if [[ -n $units ]]; then
-    xargs -r systemctl --user stop <<<"$units" || true
-  fi
-
+  rm -f "$reminder_dir"/omarchy-reminder-*.job 2>/dev/null || true
   rm -f "$reminder_dir"/omarchy-reminder-*.message 2>/dev/null || true
   omarchy-notification-send -g 󰔛 "All reminders have been cleared"
 }
@@ -120,6 +103,7 @@ remind_at=$(date -d "+${minutes} minutes" +%H:%M)
 unit="omarchy-reminder-${minutes}m-$set_at"
 reminder_dir="${XDG_RUNTIME_DIR:-/tmp}/omarchy-reminders"
 message_file="$reminder_dir/$unit.message"
+job_file="$reminder_dir/$unit.job"
 confirmation="You'll be reminded at $remind_at"
 confirmation_title="Reminder set for ${minutes} minutes"
 
@@ -130,7 +114,17 @@ if [[ -n $custom_message ]]; then
   confirmation_title="$custom_message in ${minutes} minutes"
 fi
 
-systemd-run --user --quiet --collect --on-active="${minutes}m" --unit="$unit" \
-  bash -c 'omarchy-notification-send -g 󰔛 "Reminder" "$1" -u critical; rm -f "$2"' bash "$message" "$message_file"
+scheduled_epoch=$(date -d "+${minutes} minutes" +%s)
+
+# Create job file placeholder (at command will remove both files when it fires)
+echo "PLACEHOLDER $scheduled_epoch" >"$job_file"
+
+# Schedule the reminder with at, capture job number
+job_output=$(echo "omarchy-notification-send -g 󰔛 'Reminder' '$message' -u critical; rm -f '$message_file' '$job_file'" | at now + "$minutes" minutes 2>&1)
+job_num=$(echo "$job_output" | sed -n 's/.*job \([0-9]\+\).*/\1/p')
+
+if [[ -n $job_num ]]; then
+  echo "$job_num $scheduled_epoch" >"$job_file"
+fi
 
 omarchy-notification-send -g 󰔛 "$confirmation_title" "$confirmation"

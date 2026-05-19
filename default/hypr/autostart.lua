@@ -8,9 +8,7 @@ o.exec_on_start("omarchy-first-run")
 o.exec_on_start("omarchy-powerprofiles-init")
 o.launch_on_start("omarchy-hyprland-monitor-watch")
 
--- Slow app launch fix -- set systemd vars.
-o.exec_on_start("systemctl --user import-environment $(env | cut -d'=' -f 1)")
-o.exec_on_start("dbus-update-activation-environment --systemd --all")
+o.exec_on_start("dbus-update-activation-environment --all")
 
 -- Run post-boot hooks after startup config has loaded.
 o.exec_on_start("sleep 2 && omarchy-hook post-boot")
