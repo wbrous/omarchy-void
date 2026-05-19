@@ -46,16 +46,18 @@ jobs:
             /bin/sh -c '
               set -e
 
-              # Sync repos and install tools
-              xbps-install -Syu -y
+              # Update xbps itself first to get new signing keys, then full sync
+              xbps-install -y -Su xbps
+              xbps-install -y -Su
+
+              # Install build deps
               xbps-install -y git curl bash sudo tar gzip xz
 
               # Clone void-mklive
               git clone --depth 1 https://github.com/void-linux/void-mklive /void-mklive
 
-              # Build
+              # Build ISO
               cd /src
-              OUTPUT="/src/omarchy-void-${ISO_VERSION}-x86_64.iso"
               bash iso/build.sh "$OUTPUT"
             '
 

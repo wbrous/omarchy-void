@@ -32,18 +32,19 @@ echo "  Packages: $(echo "$ISO_PACKAGES" | wc -w)"
 
 # Skip sudo if already running as root (e.g., in containers)
 if (( EUID == 0 )); then
-  "$MKLIVE_DIR/mklive.sh" \
+  # mklive.sh sources ./lib.sh, so cd into its directory first
+  (cd "$MKLIVE_DIR" && ./mklive.sh \
     -a x86_64 \
     -r "$MIRROR_URL" \
     -p "$ISO_PACKAGES" \
     -I "$SCRIPT_DIR/overlay" \
-    -o "$OUTPUT"
+    -o "$OUTPUT")
 else
-  sudo "$MKLIVE_DIR/mklive.sh" \
+  (cd "$MKLIVE_DIR" && sudo ./mklive.sh \
     -a x86_64 \
     -r "$MIRROR_URL" \
     -p "$ISO_PACKAGES" \
     -I "$SCRIPT_DIR/overlay" \
-    -o "$OUTPUT"
+    -o "$OUTPUT")
 fi
 echo "ISO built: $OUTPUT"
