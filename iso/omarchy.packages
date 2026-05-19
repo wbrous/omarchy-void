@@ -60,7 +60,7 @@ bluez
 
 # Audio
 pipewire
-pipewire-alsa
+alsa-pipewire
 pipewire-pulse
 wireplumber
 alsa-utils
