@@ -96,7 +96,7 @@ xdg-desktop-portal
 # Omarchy desktop components
 sddm
 plymouth
-waybar
+Waybar
 mako
 swayosd
 grim
