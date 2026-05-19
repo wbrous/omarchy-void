@@ -1,0 +1,101 @@
+name: Build ISO and Draft Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (e.g., 4.0.0-alpha.2)'
+        required: true
+        type: string
+      prerelease:
+        description: 'Mark as pre-release'
+        required: false
+        type: boolean
+        default: true
+
+concurrency:
+  group: build-iso
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  build-iso:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - name: Checkout omarchy-void
+        uses: actions/checkout@v4
+        with:
+          ref: dev
+          fetch-depth: 0
+
+      - name: Build ISO inside Void container
+        run: |
+          set -euo pipefail
+
+          VERSION="${{ github.event.inputs.version }}"
+          REPO="${{ github.workspace }}"
+          OUTPUT="$REPO/omarchy-void-${VERSION}-x86_64.iso"
+
+          docker run --privileged --rm \
+            -v "$REPO:/src:rw" \
+            -e MKLIVE_DIR=/void-mklive \
+            -e OMARCHY_MIRROR="https://repo-fastly.voidlinux.org/current" \
+            voidlinux/void-glibc:latest \
+            /bin/bash -c "
+              set -euo pipefail
+
+              # Sync repos and install tools
+              xbps-install -Syu -y
+              xbps-install -y git curl bash sudo tar gzip xz
+
+              # Clone void-mklive
+              git clone --depth 1 https://github.com/void-linux/void-mklive /void-mklive
+
+              # Build
+              cd /src
+              bash iso/build.sh '$OUTPUT'
+            "
+
+      - name: Upload ISO artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: omarchy-void-iso
+          path: ${{ github.workspace }}/omarchy-void-*.iso
+          retention-days: 1
+
+      - name: Show build output
+        run: ls -lh "${{ github.workspace }}"/omarchy-void-*.iso
+
+  draft-release:
+    needs: build-iso
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download ISO artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: omarchy-void-iso
+          path: ./iso
+
+      - name: Create draft release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ github.event.inputs.version }}
+          name: Omarchy-Void ${{ github.event.inputs.version }}
+          body: |
+            ## Omarchy-Void ${{ github.event.inputs.version }}
+
+            Built from [dev branch](https://github.com/${{ github.repository }}/tree/dev)
+            at commit `${{ github.sha }}`.
+
+            ### Installation
+            1. Download the ISO
+            2. Flash to a USB drive (`dd if=*.iso of=/dev/sdX bs=4M status=progress`)
+            3. Boot from USB and follow installer prompts
+
+            > This is a **draft** release. Review before publishing.
+          draft: true
+          prerelease: ${{ github.event.inputs.prerelease }}
+          files: ./iso/*.iso
