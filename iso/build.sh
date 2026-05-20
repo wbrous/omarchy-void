@@ -26,6 +26,47 @@ if [[ ! -x "$MKLIVE_DIR/mklive.sh" ]]; then
   exit 1
 fi
 
+patch_mklive_efi_boot_dir() {
+  local mklive_sh="$MKLIVE_DIR/mklive.sh"
+
+  # xorriso warns when /EFI/BOOT doesn't exist in the ISO filesystem, even though
+  # it is present inside /boot/grub/efiboot.img (El Torito). Some Windows USB tools
+  # rely on /EFI/BOOT being present as normal files.
+  if grep -q "OMARCHY_EFI_BOOT_COPY" "$mklive_sh"; then
+    return
+  fi
+
+  local tmp
+  tmp="$(mktemp)"
+
+  awk '
+    /^[[:space:]]*generate_iso_image$/ && !inserted {
+      print "";
+      print "# OMARCHY_EFI_BOOT_COPY: copy EFI boot files into ISO filesystem for Windows tools";
+      print "if [ -e \"$VOIDTARGETDIR/tmp/bootx64.efi\" ]; then";
+      print "  mkdir -p \"$IMAGEDIR/EFI/BOOT\"";
+      print "  cp -f \"$VOIDTARGETDIR/tmp/bootx64.efi\" \"$IMAGEDIR/EFI/BOOT/BOOTX64.EFI\"";
+      print "fi";
+      print "if [ -e \"$VOIDTARGETDIR/tmp/bootia32.efi\" ]; then";
+      print "  mkdir -p \"$IMAGEDIR/EFI/BOOT\"";
+      print "  cp -f \"$VOIDTARGETDIR/tmp/bootia32.efi\" \"$IMAGEDIR/EFI/BOOT/BOOTIA32.EFI\"";
+      print "fi";
+      print "if [ -e \"$VOIDTARGETDIR/tmp/bootaa64.efi\" ]; then";
+      print "  mkdir -p \"$IMAGEDIR/EFI/BOOT\"";
+      print "  cp -f \"$VOIDTARGETDIR/tmp/bootaa64.efi\" \"$IMAGEDIR/EFI/BOOT/BOOTAA64.EFI\"";
+      print "fi";
+      print "";
+      inserted=1
+    }
+    { print }
+  ' "$mklive_sh" >"$tmp"
+
+  mv "$tmp" "$mklive_sh"
+  chmod +x "$mklive_sh"
+}
+
+patch_mklive_efi_boot_dir
+
 # Gather packages for the ISO
 ISO_PACKAGES=$(grep -v '^#' "$SCRIPT_DIR/omarchy.packages" | grep -v '^$' | tr '\n' ' ')
 
