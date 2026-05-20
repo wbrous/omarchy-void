@@ -1,0 +1,3 @@
+[submodule "hyprland-void"]
+	path = hyprland-void
+	url = https://github.com/Makrennel/hyprland-void.git

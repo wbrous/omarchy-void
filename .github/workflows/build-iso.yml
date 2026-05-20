@@ -21,7 +21,122 @@ permissions:
   contents: write
 
 jobs:
+  build-packages:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - name: Checkout omarchy-void
+        uses: actions/checkout@v4
+        with:
+          ref: dev
+          fetch-depth: 0
+          submodules: recursive
+
+      - name: Build Hyprland packages inside Void container
+        run: |
+          set -euo pipefail
+
+          docker run --privileged --rm \
+            -v "${{ github.workspace }}:/src:rw" \
+            ghcr.io/void-linux/void-glibc:latest \
+            /bin/bash -c '
+              set -euo pipefail
+
+              # Update xbps and sync repos
+              xbps-install -y -Su xbps
+              xbps-install -y -Su
+
+              # Install build tools
+              xbps-install -y git bash sudo tar gzip xz \
+                base-devel cmake meson ninja pkg-config
+
+              # Clone void-packages for xbps-src infrastructure
+              git clone --depth 1 https://github.com/void-linux/void-packages.git /void-packages
+
+              # Copy only templates that are NOT already in void-packages.
+              # This avoids overwriting Void-official packages (e.g. hyprutils,
+              # hyprwayland-scanner) with older versions from the submodule.
+              for dir in /src/hyprland-void/srcpkgs/*/; do
+                pkg=$(basename "$dir")
+                # Skip symlinks (e.g. hyprland-devel -> hyprland)
+                if [[ -L "${dir%/}" ]]; then
+                  # Copy symlinks as-is only if the target was also copied
+                  cp -a "${dir%/}" "/void-packages/srcpkgs/$pkg"
+                  continue
+                fi
+                if [[ -d "/void-packages/srcpkgs/$pkg" ]]; then
+                  echo "Skipping $pkg (already in void-packages)"
+                else
+                  echo "Copying $pkg from submodule"
+                  cp -r "$dir" "/void-packages/srcpkgs/$pkg"
+                fi
+              done
+
+              # Append submodule shlibs so xbps-src knows what .so each package provides
+              cat /src/hyprland-void/common/shlibs >> /void-packages/common/shlibs
+
+              cd /void-packages
+
+              # Binary bootstrap — sets up masterdir using host binary repos
+              ./xbps-src binary-bootstrap
+
+              # Build Hyprland ecosystem in dependency order.
+              # Packages already in Void repos (hyprutils, hyprwayland-scanner,
+              # tomlplusplus) are pulled as binary deps — not rebuilt.
+              PKGS="
+                libspng
+                sdbus-cpp
+                hyprland-protocols
+                glaze
+                hyprlang
+                hyprgraphics
+                hyprcursor
+                aquamarine
+                hyprland
+                hypridle
+                hyprlock
+                hyprpaper
+                hyprpolkitagent
+                hyprsunset
+                hyprsysteminfo
+                hyprland-qt-support
+                hyprland-qtutils
+                xdg-desktop-portal-hyprland
+              "
+
+              for pkg in $PKGS; do
+                if [[ -d "srcpkgs/$pkg" ]]; then
+                  echo "=== Building $pkg ==="
+                  ./xbps-src -j"$(nproc)" pkg "$pkg" || {
+                    echo "ERROR: $pkg build failed"
+                    exit 1
+                  }
+                fi
+              done
+
+              # Collect built packages into a local repo on the mounted workspace
+              mkdir -p /src/local-repo
+              for pattern in aquamarine glaze hypr libspng sdbus-cpp tomlplusplus xdg-desktop-portal-hyprland; do
+                cp hostdir/binpkgs/${pattern}*.xbps /src/local-repo/ 2>/dev/null || true
+              done
+
+              cd /src/local-repo
+              xbps-rindex -a *.xbps
+
+              echo "=== Local repo contents ==="
+              ls -1 *.xbps | wc -l
+              echo "packages indexed"
+            '
+
+      - name: Upload built packages as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: hyprland-packages
+          path: ${{ github.workspace }}/local-repo/
+          retention-days: 1
+
   build-iso:
+    needs: build-packages
     runs-on: ubuntu-latest
     timeout-minutes: 120
     steps:
@@ -30,6 +145,20 @@ jobs:
         with:
           ref: dev
           fetch-depth: 0
+          submodules: recursive
+
+      - name: Download built packages
+        uses: actions/download-artifact@v4
+        with:
+          name: hyprland-packages
+          path: ./local-repo
+
+      - name: Reindex local repo
+        run: |
+          # Ensure repo index exists after artifact download
+          if command -v xbps-rindex &>/dev/null; then
+            cd local-repo && xbps-rindex -a *.xbps
+          fi
 
       - name: Build ISO inside Void container
         env:
@@ -42,22 +171,30 @@ jobs:
             -e ISO_VERSION="$ISO_VERSION" \
             -e MKLIVE_DIR=/void-mklive \
             -e OMARCHY_MIRROR="https://repo-fastly.voidlinux.org/current" \
+            -e HYPRLAND_REPO="file:///src/local-repo" \
             ghcr.io/void-linux/void-glibc:latest \
-            /bin/sh -c '
-              set -e
+            /bin/bash -c '
+              set -euo pipefail
 
-              # Update xbps itself first to get new signing keys, then full sync
+              # Update xbps and sync repos
               xbps-install -y -Su xbps
               xbps-install -y -Su
 
-              # Install build deps
-              xbps-install -y git curl bash sudo tar gzip xz
+              # Install build deps for mklive
+              xbps-install -y git bash sudo tar gzip xz \
+                squashfs-tools liblz4 xorriso
+
+              # Reindex local repo inside container
+              cd /src/local-repo
+              xbps-install -y xbps-triggers || true
+              xbps-rindex -a *.xbps 2>/dev/null || true
+              cd /src
 
               # Clone void-mklive
               git clone --depth 1 https://github.com/void-linux/void-mklive /void-mklive
 
-              # Build ISO
-              cd /src
+              # Build ISO — HYPRLAND_REPO is passed through to build.sh
+              OUTPUT="/src/omarchy-void-${ISO_VERSION}-x86_64.iso"
               bash iso/build.sh "$OUTPUT"
             '
 
@@ -67,9 +204,6 @@ jobs:
           name: omarchy-void-iso
           path: ${{ github.workspace }}/omarchy-void-*.iso
           retention-days: 1
-
-      - name: Show build output
-        run: ls -lh "${{ github.workspace }}"/omarchy-void-*.iso
 
   draft-release:
     needs: build-iso

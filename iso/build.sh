@@ -3,9 +3,12 @@
 # Build an Omarchy-Void installable ISO using void-mklive.
 #
 # Usage:
-#   ./iso/build.sh [--output <path>] [--mirror <url>]
+#   ./iso/build.sh [OUTPUT_PATH]
 #
-# Requires: void-mklive source checked out at ../void-mklive/
+# Environment:
+#   OMARCHY_MIRROR      - Void mirror URL (default: repo-fastly.voidlinux.org/current)
+#   HYPRLAND_REPO       - Hyprland package repo URL (file:// or https://)
+#   MKLIVE_DIR          - Path to void-mklive checkout
 
 set -euo pipefail
 
@@ -13,6 +16,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 OMARCHY_PATH="$(cd "$SCRIPT_DIR/.." && pwd)"
 MIRROR_URL="${OMARCHY_MIRROR:-https://repo-fastly.voidlinux.org/current}"
 OUTPUT="${1:-$SCRIPT_DIR/omarchy-void-$(date +%Y%m%d)-x86_64.iso}"
+HYPRLAND_REPO="${HYPRLAND_REPO:-}"
 
 MKLIVE_DIR="${MKLIVE_DIR:-$OMARCHY_PATH/../void-mklive}"
 
@@ -30,13 +34,19 @@ echo "  Output: $OUTPUT"
 echo "  Mirror: $MIRROR_URL"
 echo "  Packages: $(echo "$ISO_PACKAGES" | wc -w)"
 
+# Build extra -r flags for additional repos
+EXTRA_REPOS=()
+if [[ -n $HYPRLAND_REPO ]]; then
+  EXTRA_REPOS+=(-r "$HYPRLAND_REPO")
+fi
+
 # Skip sudo if already running as root (e.g., in containers)
 if (( EUID == 0 )); then
   # mklive.sh sources ./lib.sh, so cd into its directory first
   (cd "$MKLIVE_DIR" && ./mklive.sh \
     -a x86_64 \
     -r "$MIRROR_URL" \
-    -r "https://raw.githubusercontent.com/Makrennel/hyprland-void/repository-x86_64-glibc" \
+    ${EXTRA_REPOS[@]+"${EXTRA_REPOS[@]}"} \
     -p "$ISO_PACKAGES" \
     -I "$SCRIPT_DIR/overlay" \
     -o "$OUTPUT")
@@ -44,7 +54,7 @@ else
   (cd "$MKLIVE_DIR" && sudo ./mklive.sh \
     -a x86_64 \
     -r "$MIRROR_URL" \
-    -r "https://raw.githubusercontent.com/Makrennel/hyprland-void/repository-x86_64-glibc" \
+    ${EXTRA_REPOS[@]+"${EXTRA_REPOS[@]}"} \
     -p "$ISO_PACKAGES" \
     -I "$SCRIPT_DIR/overlay" \
     -o "$OUTPUT")
