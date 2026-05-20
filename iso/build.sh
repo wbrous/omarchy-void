@@ -45,16 +45,16 @@ if (( EUID == 0 )); then
   # mklive.sh sources ./lib.sh, so cd into its directory first
   (cd "$MKLIVE_DIR" && ./mklive.sh \
     -a x86_64 \
-    -r "$MIRROR_URL" \
     ${EXTRA_REPOS[@]+"${EXTRA_REPOS[@]}"} \
+    -r "$MIRROR_URL" \
     -p "$ISO_PACKAGES" \
     -I "$SCRIPT_DIR/overlay" \
     -o "$OUTPUT")
 else
   (cd "$MKLIVE_DIR" && sudo ./mklive.sh \
     -a x86_64 \
-    -r "$MIRROR_URL" \
     ${EXTRA_REPOS[@]+"${EXTRA_REPOS[@]}"} \
+    -r "$MIRROR_URL" \
     -p "$ISO_PACKAGES" \
     -I "$SCRIPT_DIR/overlay" \
     -o "$OUTPUT")

@@ -46,86 +46,61 @@ jobs:
               xbps-install -y -Su xbps
               xbps-install -y -Su
 
-              # Install build tools
-              xbps-install -y git sudo tar gzip xz \
-                base-devel cmake meson ninja pkg-config
+              # Install build tools (util-linux for getopt, shadow for useradd)
+              xbps-install -y git bash sudo tar gzip xz \
+                base-devel cmake meson ninja pkg-config \
+                util-linux shadow
+
+              # Create non-root builder user (xbps-src refuses to run as root)
+              useradd -m -s /bin/bash builder
 
               # Clone void-packages for xbps-src infrastructure
               git clone --depth 1 https://github.com/void-linux/void-packages.git /void-packages
 
-              # Copy only templates that are NOT already in void-packages.
-              # This avoids overwriting Void-official packages (e.g. hyprutils,
-              # hyprwayland-scanner) with older versions from the submodule.
-              for dir in /src/hyprland-void/srcpkgs/*/; do
-                pkg=$(basename "$dir")
-                # Copy symlinks as-is (e.g. hyprland-devel -> hyprland)
-                if [ -L "${dir%/}" ]; then
-                  cp -a "${dir%/}" "/void-packages/srcpkgs/$pkg"
-                  continue
-                fi
-                if [ -d "/void-packages/srcpkgs/$pkg" ]; then
-                  echo "Skipping $pkg (already in void-packages)"
-                else
-                  echo "Copying $pkg from submodule"
-                  cp -r "$dir" "/void-packages/srcpkgs/$pkg"
-                fi
-              done
-
-              # Append submodule shlibs so xbps-src knows what .so each package provides
+              # Copy ALL submodule templates into void-packages, overwriting
+              # any existing ones. This keeps the Makrennel package set
+              # self-consistent (their templates reference each other).
+              cp -r /src/hyprland-void/srcpkgs/* /void-packages/srcpkgs/
               cat /src/hyprland-void/common/shlibs >> /void-packages/common/shlibs
 
-              cd /void-packages
-
-              # Binary bootstrap — sets up masterdir using host binary repos
-              ./xbps-src binary-bootstrap
-
-              # Build Hyprland ecosystem in dependency order.
-              # Packages already in Void repos (hyprutils, hyprwayland-scanner,
-              # tomlplusplus) are pulled as binary deps — not rebuilt.
-              PKGS="
-                libspng
-                sdbus-cpp
-                hyprland-protocols
-                glaze
-                hyprlang
-                hyprgraphics
-                hyprcursor
-                aquamarine
-                hyprland
-                hypridle
-                hyprlock
-                hyprpaper
-                hyprpolkitagent
-                hyprsunset
-                hyprsysteminfo
-                hyprland-qt-support
-                hyprland-qtutils
-                xdg-desktop-portal-hyprland
-              "
-
-              for pkg in $PKGS; do
-                if [ -d "srcpkgs/$pkg" ]; then
-                  echo "=== Building $pkg ==="
-                  ./xbps-src -j"$(nproc)" pkg "$pkg" || {
-                    echo "ERROR: $pkg build failed"
-                    exit 1
-                  }
-                fi
-              done
-
-              # Collect built packages into a local repo on the mounted workspace
+              chown -R builder:builder /void-packages
               mkdir -p /src/local-repo
-              for pattern in aquamarine glaze hypr libspng sdbus-cpp tomlplusplus xdg-desktop-portal-hyprland; do
-                cp hostdir/binpkgs/${pattern}*.xbps /src/local-repo/ 2>/dev/null || true
-              done
+              chown builder:builder /src/local-repo
 
-              cd /src/local-repo
-              xbps-rindex -a *.xbps
+              # Run the entire build as the builder user in one session
+              # so hostdir/binpkgs is available for dependency resolution.
+              su -s /bin/bash builder -c "
+                cd /void-packages
+                ./xbps-src binary-bootstrap
 
-              echo "=== Local repo contents ==="
-              ls -1 *.xbps | wc -l
-              echo "packages indexed"
-            '
+                # Build in dependency order — full Hyprland ecosystem
+                for pkg in \
+                  tomlplusplus libspng sdbus-cpp \
+                  hyprutils hyprwayland-scanner \
+                  hyprland-protocols glaze \
+                  hyprlang hyprgraphics hyprcursor \
+                  aquamarine hyprland \
+                  hypridle hyprlock hyprpaper \
+                  hyprpolkitagent hyprsunset hyprsysteminfo \
+                  hyprland-qt-support hyprland-qtutils \
+                  xdg-desktop-portal-hyprland; do
+                  if [ -d srcpkgs/\$pkg ]; then
+                    echo \"=== Building \$pkg ===\"
+                    ./xbps-src -j\$(nproc) pkg \$pkg || {
+                      echo \"ERROR: \$pkg build failed\"
+                      exit 1
+                    }
+                  fi
+                done
+
+                # Collect built packages into local repo
+                for pattern in aquamarine glaze hypr libspng sdbus-cpp tomlplusplus xdg-desktop-portal-hyprland; do
+                  cp hostdir/binpkgs/\${pattern}*.xbps /src/local-repo/ 2>/dev/null || true
+                done
+                cd /src/local-repo
+                xbps-rindex -a *.xbps
+                echo \"=== Local repo: \$(ls -1 *.xbps | wc -l) packages ===\"
+              "
 
       - name: Upload built packages as artifact
         uses: actions/upload-artifact@v4
