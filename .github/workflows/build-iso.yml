@@ -58,6 +58,10 @@ jobs:
           # Clone void-packages for xbps-src infrastructure
           git clone --depth 1 https://github.com/void-linux/void-packages.git /void-packages
 
+          # GitHub-hosted Docker does not allow the default xbps-uunshare backend
+          # to write /proc/self/uid_map. Use xbps-uchroot with the xbuilder group.
+          echo XBPS_CHROOT_CMD=uchroot >> /void-packages/etc/conf
+
           # Copy ONLY the templates that are not in Void, plus some that need
           # custom compilation (like Makrennel libspng).
           # We SKIP hyprutils, tomlplusplus, and hyprwayland-scanner because
@@ -100,6 +104,8 @@ jobs:
             set -x
             id
             cd /void-packages
+            cat etc/conf
+            ls -l /usr/bin/xbps-uchroot
             ./xbps-src binary-bootstrap
 
             # Build in dependency order — full Hyprland ecosystem
