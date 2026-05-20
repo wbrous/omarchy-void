@@ -39,15 +39,15 @@ jobs:
           docker run --privileged --rm \
             -v "${{ github.workspace }}:/src:rw" \
             ghcr.io/void-linux/void-glibc:latest \
-            /bin/bash -c '
-              set -euo pipefail
+            /bin/sh -c '
+              set -eu
 
               # Update xbps and sync repos
               xbps-install -y -Su xbps
               xbps-install -y -Su
 
               # Install build tools
-              xbps-install -y git bash sudo tar gzip xz \
+              xbps-install -y git sudo tar gzip xz \
                 base-devel cmake meson ninja pkg-config
 
               # Clone void-packages for xbps-src infrastructure
@@ -58,13 +58,12 @@ jobs:
               # hyprwayland-scanner) with older versions from the submodule.
               for dir in /src/hyprland-void/srcpkgs/*/; do
                 pkg=$(basename "$dir")
-                # Skip symlinks (e.g. hyprland-devel -> hyprland)
-                if [[ -L "${dir%/}" ]]; then
-                  # Copy symlinks as-is only if the target was also copied
+                # Copy symlinks as-is (e.g. hyprland-devel -> hyprland)
+                if [ -L "${dir%/}" ]; then
                   cp -a "${dir%/}" "/void-packages/srcpkgs/$pkg"
                   continue
                 fi
-                if [[ -d "/void-packages/srcpkgs/$pkg" ]]; then
+                if [ -d "/void-packages/srcpkgs/$pkg" ]; then
                   echo "Skipping $pkg (already in void-packages)"
                 else
                   echo "Copying $pkg from submodule"
@@ -105,7 +104,7 @@ jobs:
               "
 
               for pkg in $PKGS; do
-                if [[ -d "srcpkgs/$pkg" ]]; then
+                if [ -d "srcpkgs/$pkg" ]; then
                   echo "=== Building $pkg ==="
                   ./xbps-src -j"$(nproc)" pkg "$pkg" || {
                     echo "ERROR: $pkg build failed"
@@ -153,13 +152,6 @@ jobs:
           name: hyprland-packages
           path: ./local-repo
 
-      - name: Reindex local repo
-        run: |
-          # Ensure repo index exists after artifact download
-          if command -v xbps-rindex &>/dev/null; then
-            cd local-repo && xbps-rindex -a *.xbps
-          fi
-
       - name: Build ISO inside Void container
         env:
           ISO_VERSION: ${{ github.event.inputs.version }}
@@ -173,8 +165,8 @@ jobs:
             -e OMARCHY_MIRROR="https://repo-fastly.voidlinux.org/current" \
             -e HYPRLAND_REPO="file:///src/local-repo" \
             ghcr.io/void-linux/void-glibc:latest \
-            /bin/bash -c '
-              set -euo pipefail
+            /bin/sh -c '
+              set -eu
 
               # Update xbps and sync repos
               xbps-install -y -Su xbps
@@ -182,11 +174,10 @@ jobs:
 
               # Install build deps for mklive
               xbps-install -y git bash sudo tar gzip xz \
-                squashfs-tools liblz4 xorriso
+                squashfs-tools liblz4 xorriso syslinux
 
               # Reindex local repo inside container
               cd /src/local-repo
-              xbps-install -y xbps-triggers || true
               xbps-rindex -a *.xbps 2>/dev/null || true
               cd /src
 
