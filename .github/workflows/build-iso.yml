@@ -36,7 +36,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          docker run --privileged --rm -i \
+          docker run --privileged --rm -i --userns=host \
             -v "${{ github.workspace }}:/src:rw" \
             ghcr.io/void-linux/void-glibc:latest \
             /bin/sh -s <<'VOID_SCRIPT'
