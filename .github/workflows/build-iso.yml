@@ -101,6 +101,7 @@ jobs:
                 xbps-rindex -a *.xbps
                 echo \"=== Local repo: \$(ls -1 *.xbps | wc -l) packages ===\"
               "
+            '
 
       - name: Upload built packages as artifact
         uses: actions/upload-artifact@v4
