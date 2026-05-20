@@ -52,7 +52,8 @@ jobs:
             util-linux shadow
 
           # Create non-root builder user (xbps-src refuses to run as root)
-          useradd -m -s /bin/bash builder
+          # xbps-src expects the build user to be in the xbuilder group.
+          useradd -m -s /bin/bash -G xbuilder builder
 
           # Clone void-packages for xbps-src infrastructure
           git clone --depth 1 https://github.com/void-linux/void-packages.git /void-packages
@@ -96,6 +97,8 @@ jobs:
           # Run the entire build as the builder user in one session
           # so hostdir/binpkgs is available for dependency resolution.
           su -s /bin/bash builder -c "
+            set -x
+            id
             cd /void-packages
             ./xbps-src binary-bootstrap
 
