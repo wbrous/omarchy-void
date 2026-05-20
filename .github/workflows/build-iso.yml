@@ -81,6 +81,11 @@ jobs:
             cp -r "$dir" "/void-packages/srcpkgs/$pkg"
           done
 
+          # Apply Omarchy-specific packaging overlays without modifying the submodule.
+          if [ -d /src/ci/srcpkgs-overrides ]; then
+            cp -r /src/ci/srcpkgs-overrides/* /void-packages/srcpkgs/
+          fi
+
           # Patch Makrennel makedepends to correctly reference Void -devel packages
           sed -E -i 's/\btomlplusplus\b(-devel)?/tomlplusplus-devel/g' /void-packages/srcpkgs/*/template
           sed -E -i 's/\bsdbus-cpp\b(-devel)?/sdbus-c++-devel/g' /void-packages/srcpkgs/*/template
@@ -169,11 +174,13 @@ jobs:
           set -euo pipefail
 
           docker run --privileged --rm -i \
+            -v /dev:/dev \
+            -v /lib/modules:/lib/modules:ro \
             -v "${{ github.workspace }}:/src:rw" \
             -e ISO_VERSION="$ISO_VERSION" \
             -e MKLIVE_DIR=/void-mklive \
             -e OMARCHY_MIRROR="https://repo-fastly.voidlinux.org/current" \
-            -e HYPRLAND_REPO="file:///src/local-repo" \
+            -e HYPRLAND_REPO="/src/local-repo" \
             ghcr.io/void-linux/void-glibc:latest \
             /bin/sh -s <<'VOID_SCRIPT'
           set -eu
@@ -184,6 +191,7 @@ jobs:
 
           # Install build deps for mklive
           xbps-install -y git bash sudo tar gzip xz \
+            findutils util-linux kmod dosfstools e2fsprogs \
             squashfs-tools liblz4 xorriso syslinux
 
           # Reindex local repo inside container
