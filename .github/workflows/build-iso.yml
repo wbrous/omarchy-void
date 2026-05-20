@@ -57,11 +57,37 @@ jobs:
               # Clone void-packages for xbps-src infrastructure
               git clone --depth 1 https://github.com/void-linux/void-packages.git /void-packages
 
-              # Copy ALL submodule templates into void-packages, overwriting
-              # any existing ones. This keeps the Makrennel package set
-              # self-consistent (their templates reference each other).
-              cp -r /src/hyprland-void/srcpkgs/* /void-packages/srcpkgs/
-              cat /src/hyprland-void/common/shlibs >> /void-packages/common/shlibs
+              # Copy ONLY the templates that are not in Void, plus some that need
+              # custom compilation (like Makrennel's libspng).
+              # We SKIP hyprutils, tomlplusplus, and hyprwayland-scanner because
+              # Void's official repos have newer/correctly-split versions of them.
+              for dir in /src/hyprland-void/srcpkgs/*/; do
+                pkg=$(basename "$dir")
+                # Skip symlinks (e.g. hyprland-devel -> hyprland)
+                if [ -L "${dir%/}" ]; then
+                  cp -a "${dir%/}" "/void-packages/srcpkgs/$pkg"
+                  continue
+                fi
+                # Skip packages Void already provides appropriately
+                if [ -d "/void-packages/srcpkgs/$pkg" ] || [ "$pkg" = "sdbus-cpp" ]; then
+                  echo "Skipping $pkg (using Void's version instead)"
+                  continue
+                fi
+                cp -r "$dir" "/void-packages/srcpkgs/$pkg"
+              done
+
+              # Patch Makrennel's makedepends to correctly reference Void's -devel packages
+              sed -E -i 's/\btomlplusplus\b(-devel)?/tomlplusplus-devel/g' /void-packages/srcpkgs/*/template
+              sed -E -i 's/\bsdbus-cpp\b(-devel)?/sdbus-c++-devel/g' /void-packages/srcpkgs/*/template
+
+              # Append submodule shlibs ONLY for the packages we actually copied.
+              # Blindly appending all of them breaks xbps-src pkglint for packages like hyprutils.
+              while read -r line; do
+                pkgname=$(echo "$line" | awk '{print $2}' | sed 's/-[0-9].*//')
+                if [ -n "$pkgname" ] && [ -d "/void-packages/srcpkgs/$pkgname" ] && [ -d "/src/hyprland-void/srcpkgs/$pkgname" ]; then
+                  echo "$line" >> /void-packages/common/shlibs
+                fi
+              done < /src/hyprland-void/common/shlibs
 
               chown -R builder:builder /void-packages
               mkdir -p /src/local-repo
@@ -75,8 +101,7 @@ jobs:
 
                 # Build in dependency order — full Hyprland ecosystem
                 for pkg in \
-                  tomlplusplus libspng sdbus-cpp \
-                  hyprutils hyprwayland-scanner \
+                  libspng \
                   hyprland-protocols glaze \
                   hyprlang hyprgraphics hyprcursor \
                   aquamarine hyprland \
@@ -94,7 +119,7 @@ jobs:
                 done
 
                 # Collect built packages into local repo
-                for pattern in aquamarine glaze hypr libspng sdbus-cpp tomlplusplus xdg-desktop-portal-hyprland; do
+                for pattern in aquamarine glaze hypr libspng xdg-desktop-portal-hyprland; do
                   cp hostdir/binpkgs/\${pattern}*.xbps /src/local-repo/ 2>/dev/null || true
                 done
                 cd /src/local-repo
